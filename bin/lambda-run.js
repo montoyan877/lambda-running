@@ -18,10 +18,7 @@ const { saveEvent, getEvents, getEvent, deleteEvent } = require('../src/event-st
 const program = new Command();
 
 // Set up the CLI
-program
-  .name('lambda-run')
-  .description('Test AWS Lambda functions locally')
-  .version('0.1.0');
+program.name('lambda-run').description('Test AWS Lambda functions locally').version('0.1.0');
 
 // Run a handler with an event
 program
@@ -33,10 +30,11 @@ program
   .option('-n, --event-name <name>', 'Name of saved event to use')
   .option('-c, --category <category>', 'Category of saved event to use')
   .option('-s, --save <name>', 'Save the event for future use with this name')
+  .option('--no-env', 'Do not load environment variables from .env file')
   .action(async (handlerPath, handlerMethod, options) => {
     try {
       let eventData = {};
-      
+
       // Load event data from various sources
       if (options.eventName) {
         const savedEvent = getEvent(options.eventName, options.category || 'default');
@@ -68,25 +66,32 @@ program
           }
         }
       }
-      
+
       // Save the event if requested
       if (options.save && Object.keys(eventData).length > 0) {
         saveEvent(options.save, eventData, options.category || 'default');
         console.log(chalk.green(`Event saved as: ${options.save}`));
       }
-      
+
       console.log(chalk.yellow('Running Lambda handler...'));
-      
-      // Run the handler
+
+      // Run the handler with options
+      const handlerOptions = {
+        loadEnv: options.env !== false,
+      };
+
+      if (handlerOptions.loadEnv) {
+        console.log(chalk.blue('Loading environment variables from .env file if present'));
+      }
+
       const startTime = Date.now();
-      const result = await runHandler(handlerPath, handlerMethod, eventData);
+      const result = await runHandler(handlerPath, handlerMethod, eventData, {}, handlerOptions);
       const duration = Date.now() - startTime;
-      
+
       console.log(chalk.green(`\nExecution completed in ${duration}ms`));
       console.log(chalk.cyan('--- Result ---'));
       console.log(JSON.stringify(result, null, 2));
-      console.log('\n')
-      
+      console.log('\n');
     } catch (error) {
       console.error(chalk.red(`Error: ${error.message}`));
       console.error(error.stack);
@@ -99,22 +104,45 @@ program
   .command('scan')
   .description('Scan a directory for potential Lambda handlers')
   .argument('[directory]', 'Directory to scan', process.cwd())
-  .option('-e, --extensions <extensions>', 'Comma-separated list of file extensions to include', '.js,.ts')
+  .option(
+    '-e, --extensions <extensions>',
+    'Comma-separated list of file extensions to include',
+    '.js,.ts'
+  )
+  .option('--include-node-modules', 'Include node_modules directory in scan (not recommended)')
+  .option('--no-ignore-file', 'Ignore the .lambdarunignore file')
   .action((directory, options) => {
     try {
       const extensions = options.extensions.split(',');
-      const handlers = scanForHandlers(directory, extensions);
-      
+
+      // Configure scanning options
+      const scanOptions = {
+        ignoreNodeModules: !options.includeNodeModules,
+        useIgnoreFile: options.ignoreFile !== false,
+      };
+
+      if (scanOptions.useIgnoreFile) {
+        console.log(chalk.blue('Using .lambdarunignore file if present'));
+      }
+
+      if (!scanOptions.ignoreNodeModules) {
+        console.log(
+          chalk.yellow('Warning: Including node_modules may slow down scanning significantly')
+        );
+      }
+
+      const handlers = scanForHandlers(directory, extensions, scanOptions);
+
       if (handlers.length === 0) {
         console.log(chalk.yellow('No potential handlers found'));
         return;
       }
-      
+
       console.log(chalk.green(`Found ${handlers.length} potential handlers:`));
       handlers.forEach((handler, index) => {
         console.log(chalk.cyan(`\n${index + 1}. ${path.relative(process.cwd(), handler.path)}`));
         console.log(chalk.white('   Methods:'));
-        handler.methods.forEach(method => {
+        handler.methods.forEach((method) => {
           console.log(chalk.white(`   - ${method}`));
         });
       });
@@ -132,12 +160,12 @@ program
   .action((options) => {
     try {
       const events = getEvents(options.category || null);
-      
+
       if (events.length === 0) {
         console.log(chalk.yellow('No saved events found'));
         return;
       }
-      
+
       console.log(chalk.green(`Found ${events.length} saved events:`));
       events.forEach((event, index) => {
         console.log(chalk.cyan(`\n${index + 1}. ${event.name} (${event.category})`));
@@ -162,7 +190,7 @@ program
   .action((name, options) => {
     try {
       const success = deleteEvent(name, options.category);
-      
+
       if (success) {
         console.log(chalk.green(`Event '${name}' deleted successfully`));
       } else {
@@ -193,22 +221,22 @@ program
 function readInput(prompt, defaultValue = '') {
   return new Promise((resolve) => {
     process.stdout.write(`${prompt}${defaultValue ? ' (' + defaultValue + ')' : ''}: `);
-    
+
     // Array to store chunks
     const inputChunks = [];
-    
+
     // Handle input
     process.stdin.resume();
     process.stdin.setEncoding('utf8');
-    
+
     process.stdin.on('data', (chunk) => {
       // Stop listening after the first chunk
       process.stdin.pause();
       process.stdin.removeAllListeners('data');
-      
+
       // Clean the chunk (remove line breaks and spaces)
       const input = chunk.toString().trim();
-      
+
       // Resolve with the entered value or the default value
       resolve(input || defaultValue);
     });
@@ -218,38 +246,58 @@ function readInput(prompt, defaultValue = '') {
 // New function for interactive mode that allows execution in a loop
 async function runInteractiveMode() {
   let continueRunning = true;
-  
+
   while (continueRunning) {
     // Scan for handlers
     console.log(chalk.blue('Scanning for handlers...'));
-    const handlers = scanForHandlers(process.cwd());
-    
+
+    // Configure scanning options (in interactive mode we always use default settings)
+    const scanOptions = {
+      ignoreNodeModules: true,
+      useIgnoreFile: true,
+    };
+
+    // Use chalk.green for important messages and simplify
+    console.log(chalk.green('Using .lambdarunignore file if present'));
+    // We removed the node_modules message to reduce verbosity
+
+    const handlers = scanForHandlers(process.cwd(), ['.js', '.ts'], scanOptions);
+
     if (handlers.length === 0) {
       console.log(chalk.yellow('No potential handlers found in the current directory'));
       return;
     }
-    
+
     // Prepare handler choices
-    const handlerChoices = handlers.flatMap(handler => 
-      handler.methods.map(method => ({
+    const handlerChoices = handlers.flatMap((handler) =>
+      handler.methods.map((method) => ({
         name: `${path.relative(process.cwd(), handler.path)} -> ${method}`,
-        value: { path: handler.path, method }
+        value: { path: handler.path, method },
       }))
     );
-    
+
     // Ask user to select a handler
+    // Clean the screen before showing the prompt to avoid overlapping
+    if (process.stdout.isTTY) {
+      process.stdout.write('\x1Bc'); // Code to clear the screen
+    }
+
     const { selectedHandler } = await inquirer.prompt([
       {
         type: 'list',
         name: 'selectedHandler',
         message: 'Select a handler to run:',
-        choices: handlerChoices
-      }
+        choices: handlerChoices,
+        pageSize: 15, // Maximum number of options to show at once
+        loop: false, // Prevent cursor from returning to beginning when reaching the end
+        prefix: chalk.cyan('➤ '),
+        suffix: ' ', // Additional space
+      },
     ]);
-    
+
     // Load saved events
     const savedEvents = getEvents();
-    
+
     // Ask for event input method
     const { eventSource } = await inquirer.prompt([
       {
@@ -261,19 +309,23 @@ async function runInteractiveMode() {
           ...(savedEvents.length > 0 ? [{ name: 'Use saved event', value: 'saved' }] : []),
           { name: 'Empty event ({})', value: 'empty' },
           { name: 'Enter JSON manually', value: 'manual' },
-        ]
-      }
+        ],
+        pageSize: 10, // Maximum number of options to show at once
+        loop: false, // Prevent cursor from returning to beginning when reaching the end
+        prefix: chalk.cyan('➤ '),
+        suffix: ' ', // Additional space
+      },
     ]);
-    
+
     let eventData = {};
     let isNewEvent = false; // Indicator to know if it's a new event that could be saved
-    
+
     // Handle event source selection
     if (eventSource === 'manual') {
       // Open the editor directly without using additional inquirer.prompt
       const editor = require('external-editor');
       let manualEvent = editor.edit('{\n  \n}');
-      
+
       try {
         eventData = JSON.parse(manualEvent);
         isNewEvent = true; // It's a manually created event, could be saved
@@ -286,14 +338,16 @@ async function runInteractiveMode() {
         {
           type: 'input',
           name: 'eventFile',
-          message: 'Enter the path to the event file:'
-        }
+          message: 'Enter the path to the event file:',
+          prefix: chalk.cyan('➤ '),
+          suffix: ' ',
+        },
       ]);
-      
+
       try {
         const eventContent = fs.readFileSync(eventFile, 'utf8');
         eventData = JSON.parse(eventContent);
-        // No marcamos isNewEvent como true ya que viene de un archivo
+        // We don't mark isNewEvent as true since it comes from a file
       } catch (error) {
         console.error(chalk.red(`Error loading event file: ${error.message}`));
         continue;
@@ -304,20 +358,24 @@ async function runInteractiveMode() {
           type: 'list',
           name: 'selectedEvent',
           message: 'Select a saved event:',
-          choices: savedEvents.map(event => ({
+          choices: savedEvents.map((event) => ({
             name: `${event.name} (${event.category})`,
-            value: event
-          }))
-        }
+            value: event,
+          })),
+          pageSize: 10,
+          loop: false,
+          prefix: chalk.cyan('➤ '),
+          suffix: ' ',
+        },
       ]);
-      
+
       eventData = selectedEvent.data;
-      // No marcamos isNewEvent como true ya que viene de un evento guardado
+      // We don't mark isNewEvent as true since it comes from a saved event
     } else if (eventSource === 'empty') {
-      // Para eventos vacíos, no preguntamos si quiere guardarlo
+      // For empty events, we don't ask if they want to save it
       eventData = {};
     }
-    
+
     // Only ask if you want to save the event if it's new (manual) and has content
     if (isNewEvent && Object.keys(eventData).length > 0) {
       console.log(chalk.dim('─────────────────────────────────────'));
@@ -326,38 +384,53 @@ async function runInteractiveMode() {
           type: 'confirm',
           name: 'shouldSave',
           message: 'Do you want to save this event for future use?',
-          default: false
-        }
+          default: false,
+          prefix: chalk.cyan('➤ '),
+          suffix: ' ',
+        },
       ]);
-      
+
       if (shouldSave) {
         // Use the direct approach to get the event name
         const eventName = await readInput('Enter a name for this event', 'my-event');
         // Show what was entered in cyan color
         console.log(chalk.cyan(`Event name: ${eventName}`));
-        
+
         // Use the same direct approach for the category
         const eventCategory = await readInput('Enter a category (optional)', 'default');
         console.log(chalk.cyan(`Event category: ${eventCategory}`));
-        
+
         // Save the event with the collected data
         saveEvent(eventName, eventData, eventCategory);
         console.log(chalk.green(`Event saved as: ${eventName} in category: ${eventCategory}`));
       }
     }
-    
+
     // Run the handler
     console.log(chalk.yellow('\nRunning Lambda handler...'));
-    
+
     try {
+      // Handler options
+      const handlerOptions = {
+        loadEnv: true, // In interactive mode, always load environment variables
+      };
+
+      console.log(chalk.blue('Loading environment variables from .env file if present'));
+
       const startTime = Date.now();
-      const result = await runHandler(selectedHandler.path, selectedHandler.method, eventData);
+      const result = await runHandler(
+        selectedHandler.path,
+        selectedHandler.method,
+        eventData,
+        {},
+        handlerOptions
+      );
       const duration = Date.now() - startTime;
-      
+
       console.log(chalk.green(`\nExecution completed in ${duration}ms`));
       console.log(chalk.cyan('--- Result ---'));
       console.log(JSON.stringify(result, null, 2));
-      console.log('\n')
+      console.log('\n');
     } catch (error) {
       console.error(chalk.red(`Error running Lambda handler: ${error.message}`));
       if (error.stack) {
@@ -365,26 +438,28 @@ async function runInteractiveMode() {
       }
       console.log('\n');
     }
-    
-    // Preguntar si quiere probar otro handler
+
+    // Ask if the user wants to test another handler
     const { runAnother } = await inquirer.prompt([
       {
         type: 'confirm',
         name: 'runAnother',
         message: 'Would you like to test another handler?',
-        default: true
-      }
+        default: true,
+        prefix: chalk.cyan('➤ '),
+        suffix: ' ',
+      },
     ]);
-    
+
     continueRunning = runAnother;
-    
+
     if (continueRunning) {
       console.log(chalk.blue('\n----------------------------------------'));
       console.log(chalk.blue('Starting new test session'));
       console.log(chalk.blue('----------------------------------------\n'));
     }
   }
-  
+
   console.log(chalk.green('\nThanks for using Lambda Running!'));
 }
 
@@ -394,4 +469,4 @@ program.parse(process.argv);
 // If no command is specified, show help
 if (!process.argv.slice(2).length) {
   program.outputHelp();
-} 
+}

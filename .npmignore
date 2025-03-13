@@ -1,0 +1,28 @@
+# Development files
+.git
+.github
+.gitignore
+.eslintrc.js
+.eslintignore
+jest.config.js
+coverage/
+
+# Tests
+test/
+__tests__/
+*.test.js
+*.spec.js
+
+# Build process
+node_modules/
+.npm/
+.DS_Store
+*.log
+
+# IDE related
+.idea/
+.vscode/
+
+# Misc
+docs/
+examples/ 

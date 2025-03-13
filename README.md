@@ -1,6 +1,6 @@
 # Lambda Running
 
-![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)
+![Version](https://img.shields.io/badge/version-0.1.1-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 > A powerful library for running and testing AWS Lambda functions locally with custom events.
@@ -12,9 +12,12 @@ Lambda Running provides a seamless local testing environment for your AWS Lambda
 - **Interactive Mode** - Run Lambda functions with an intuitive CLI interface
 - **Custom Event Support** - Test with your own event payloads
 - **Event Management** - Save, load, and reuse event payloads
-- **TypeScript Support** - Test both JavaScript and TypeScript Lambda functions
+- **TypeScript Support** - Test TypeScript Lambda functions using your project's own tsconfig.json, including path aliases (@/\*)
+- **Environment Variables** - Automatically loads variables from `.env` files
+- **Lambda Focused** - Specifically detects functions named `handler` as per AWS Lambda conventions
 - **Realistic Context** - Simulates AWS Lambda execution context
 - **Zero Configuration** - Works with your existing Lambda code
+- **Smart Scanning** - Ignores node_modules and supports .lambdarunignore for faster execution
 
 ## 📋 Table of Contents
 
@@ -23,8 +26,11 @@ Lambda Running provides a seamless local testing environment for your AWS Lambda
   - [Interactive Mode](#interactive-mode)
   - [CLI Commands](#cli-commands)
   - [Programmatic API](#programmatic-api)
-- [Example](#example)
 - [Configuration](#configuration)
+  - [.lambdarunignore](#lambdarunignore)
+  - [Environment Variables](#environment-variables)
+  - [TypeScript Support](#typescript-support)
+- [Example](#example)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -41,8 +47,14 @@ npm install lambda-running --save-dev
 For TypeScript support:
 
 ```bash
+# Basic TypeScript support
 npm install -g ts-node typescript
+
+# For projects using path aliases (@/* imports)
+npm install --save-dev tsconfig-paths
 ```
+
+Lambda Running will automatically use your project's `tsconfig.json` if it exists, including properly resolving path aliases like `@/*` in your imports.
 
 ## 💻 Usage
 
@@ -128,25 +140,25 @@ Let's say you have a Lambda function that processes user data:
 
 ```javascript
 // handler.js
-exports.processUser = async (event, context) => {
+exports.handler = async (event, context) => {
   // Validate the user
   if (!event.userId) {
     return {
       statusCode: 400,
-      body: JSON.stringify({ message: 'Missing userId' })
+      body: JSON.stringify({ message: 'Missing userId' }),
     };
   }
 
   // Process the user...
   return {
     statusCode: 200,
-    body: JSON.stringify({ 
+    body: JSON.stringify({
       message: 'User processed successfully',
       userId: event.userId,
       context: {
-        awsRequestId: context.awsRequestId
-      }
-    })
+        awsRequestId: context.awsRequestId,
+      },
+    }),
   };
 };
 ```
@@ -160,15 +172,52 @@ lambda-run i
 Or directly with the CLI:
 
 ```bash
-lambda-run run handler.js processUser --event '{"userId": "123"}'
+lambda-run run handler.js handler --event '{"userId": "123"}'
 ```
+
+**Note:** Lambda Running specifically looks for functions named `handler` to align with AWS Lambda conventions.
 
 ## ⚙️ Configuration
 
-Lambda Running works out of the box with zero configuration. However, you can configure its behavior through environment variables:
+Lambda Running works out of the box with zero configuration. However, you can customize its behavior in several ways:
 
-- `LAMBDA_RUNNING_EVENT_DIR`: Custom directory for saved events (default: `~/.lambda-running/events`)
-- `LAMBDA_RUNNING_TIMEOUT`: Default timeout in milliseconds (default: `30000`)
+### Environment Variables
+
+Lambda Running supports two types of environment variables:
+
+1. **Configuration Variables** - Control the behavior of the Lambda Running tool:
+
+   - `LAMBDA_RUNNING_EVENT_DIR`: Custom directory for saved events (default: `~/.lambda-running/events`)
+   - `LAMBDA_RUNNING_TIMEOUT`: Default timeout in milliseconds (default: `30000`)
+
+2. **Function Variables** - Variables passed to your Lambda function from `.env` files:
+   - Lambda Running automatically loads variables from a `.env` file in your project root
+   - These variables are made available to your Lambda function through `process.env`
+   - For more information, see the [environment variables documentation](./docs/environment-variables.md)
+
+### .lambdarunignore
+
+You can create a `.lambdarunignore` file in your project root to exclude directories and files from handler scanning:
+
+```
+# Comments start with #
+dist
+coverage
+.git
+*.test.js
+```
+
+By default, `node_modules` is always excluded. For more information, see the [.lambdarunignore documentation](./docs/lambdarunignore.md).
+
+### TypeScript Support
+
+Lambda Running automatically detects and uses your project's TypeScript configuration:
+
+- Uses your project's `tsconfig.json` if available
+- Falls back to reasonable defaults if no configuration is found
+- Supports TypeScript handler files (.ts) directly without compilation
+
+For more information, see the [TypeScript support documentation](./docs/typescript.md).
 
 ## 🤝 Contributing
 
@@ -176,4 +225,4 @@ Contributions, issues and feature requests are welcome. Feel free to check [issu
 
 ## 📜 License
 
-This project is [MIT](LICENSE) licensed. 
+This project is [MIT](LICENSE) licensed.

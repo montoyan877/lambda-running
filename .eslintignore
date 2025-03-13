@@ -1,0 +1,11 @@
+# Directorios de dependencias
+node_modules
+coverage
+
+# Directorios de construcción
+dist
+lib
+build
+
+# Archivos generados
+.husky 
