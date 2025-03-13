@@ -29,8 +29,9 @@
   "dependencies": {
     "chalk": "^4.1.2",
     "commander": "^11.0.0",
+    "enquirer": "^2.4.1",
     "external-editor": "^3.1.0",
-    "inquirer": "^8.2.5"
+    "inquirer": "^7.3.3"
   },
   "optionalDependencies": {
     "tsconfig-paths": "^3.14.2"

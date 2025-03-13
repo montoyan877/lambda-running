@@ -10,7 +10,7 @@ const path = require('path');
 const chalk = require('chalk');
 const { Command } = require('commander');
 const inquirer = require('inquirer');
-const readline = require('readline');
+const Enquirer = require('enquirer');
 
 const { runHandler, scanForHandlers } = require('../src/lambda-runner');
 const { saveEvent, getEvents, getEvent, deleteEvent } = require('../src/event-store');
@@ -248,215 +248,242 @@ async function runInteractiveMode() {
   let continueRunning = true;
 
   while (continueRunning) {
-    // Scan for handlers
-    console.log(chalk.blue('Scanning for handlers...'));
-
-    // Configure scanning options (in interactive mode we always use default settings)
-    const scanOptions = {
-      ignoreNodeModules: true,
-      useIgnoreFile: true,
-    };
-
-    // Use chalk.green for important messages and simplify
-    console.log(chalk.green('Using .lambdarunignore file if present'));
-    // We removed the node_modules message to reduce verbosity
-
-    const handlers = scanForHandlers(process.cwd(), ['.js', '.ts'], scanOptions);
-
-    if (handlers.length === 0) {
-      console.log(chalk.yellow('No potential handlers found in the current directory'));
-      return;
-    }
-
-    // Prepare handler choices
-    const handlerChoices = handlers.flatMap((handler) =>
-      handler.methods.map((method) => ({
-        name: `${path.relative(process.cwd(), handler.path)} -> ${method}`,
-        value: { path: handler.path, method },
-      }))
-    );
-
-    // Ask user to select a handler
-    // Clean the screen before showing the prompt to avoid overlapping
-    if (process.stdout.isTTY) {
-      process.stdout.write('\x1Bc'); // Code to clear the screen
-    }
-
-    const { selectedHandler } = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'selectedHandler',
-        message: 'Select a handler to run:',
-        choices: handlerChoices,
-        pageSize: 15, // Maximum number of options to show at once
-        loop: false, // Prevent cursor from returning to beginning when reaching the end
-        prefix: chalk.cyan('➤ '),
-        suffix: ' ', // Additional space
-      },
-    ]);
-
-    // Load saved events
-    const savedEvents = getEvents();
-
-    // Ask for event input method
-    const { eventSource } = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'eventSource',
-        message: 'How would you like to provide the event?',
-        choices: [
-          { name: 'Load from file', value: 'file' },
-          ...(savedEvents.length > 0 ? [{ name: 'Use saved event', value: 'saved' }] : []),
-          { name: 'Empty event ({})', value: 'empty' },
-          { name: 'Enter JSON manually', value: 'manual' },
-        ],
-        pageSize: 10, // Maximum number of options to show at once
-        loop: false, // Prevent cursor from returning to beginning when reaching the end
-        prefix: chalk.cyan('➤ '),
-        suffix: ' ', // Additional space
-      },
-    ]);
-
-    let eventData = {};
-    let isNewEvent = false; // Indicator to know if it's a new event that could be saved
-
-    // Handle event source selection
-    if (eventSource === 'manual') {
-      // Open the editor directly without using additional inquirer.prompt
-      const editor = require('external-editor');
-      let manualEvent = editor.edit('{\n  \n}');
-
-      try {
-        eventData = JSON.parse(manualEvent);
-        isNewEvent = true; // It's a manually created event, could be saved
-      } catch (error) {
-        console.error(chalk.red(`Invalid JSON: ${error.message}`));
-        continue;
-      }
-    } else if (eventSource === 'file') {
-      const { eventFile } = await inquirer.prompt([
-        {
-          type: 'input',
-          name: 'eventFile',
-          message: 'Enter the path to the event file:',
-          prefix: chalk.cyan('➤ '),
-          suffix: ' ',
-        },
-      ]);
-
-      try {
-        const eventContent = fs.readFileSync(eventFile, 'utf8');
-        eventData = JSON.parse(eventContent);
-        // We don't mark isNewEvent as true since it comes from a file
-      } catch (error) {
-        console.error(chalk.red(`Error loading event file: ${error.message}`));
-        continue;
-      }
-    } else if (eventSource === 'saved') {
-      const { selectedEvent } = await inquirer.prompt([
-        {
-          type: 'list',
-          name: 'selectedEvent',
-          message: 'Select a saved event:',
-          choices: savedEvents.map((event) => ({
-            name: `${event.name} (${event.category})`,
-            value: event,
-          })),
-          pageSize: 10,
-          loop: false,
-          prefix: chalk.cyan('➤ '),
-          suffix: ' ',
-        },
-      ]);
-
-      eventData = selectedEvent.data;
-      // We don't mark isNewEvent as true since it comes from a saved event
-    } else if (eventSource === 'empty') {
-      // For empty events, we don't ask if they want to save it
-      eventData = {};
-    }
-
-    // Only ask if you want to save the event if it's new (manual) and has content
-    if (isNewEvent && Object.keys(eventData).length > 0) {
-      console.log(chalk.dim('─────────────────────────────────────'));
-      const { shouldSave } = await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: 'shouldSave',
-          message: 'Do you want to save this event for future use?',
-          default: false,
-          prefix: chalk.cyan('➤ '),
-          suffix: ' ',
-        },
-      ]);
-
-      if (shouldSave) {
-        // Use the direct approach to get the event name
-        const eventName = await readInput('Enter a name for this event', 'my-event');
-        // Show what was entered in cyan color
-        console.log(chalk.cyan(`Event name: ${eventName}`));
-
-        // Use the same direct approach for the category
-        const eventCategory = await readInput('Enter a category (optional)', 'default');
-        console.log(chalk.cyan(`Event category: ${eventCategory}`));
-
-        // Save the event with the collected data
-        saveEvent(eventName, eventData, eventCategory);
-        console.log(chalk.green(`Event saved as: ${eventName} in category: ${eventCategory}`));
-      }
-    }
-
-    // Run the handler
-    console.log(chalk.yellow('\nRunning Lambda handler...'));
-
     try {
-      // Handler options
-      const handlerOptions = {
-        loadEnv: true, // In interactive mode, always load environment variables
+      // Preload: scan handlers and prepare everything BEFORE the interactive interface
+      console.log(chalk.blue('Scanning for handlers...'));
+
+      // Configure scanning options
+      const scanOptions = {
+        ignoreNodeModules: true,
+        useIgnoreFile: true,
       };
 
-      console.log(chalk.blue('Loading environment variables from .env file if present'));
+      console.log(chalk.green('Using .lambdarunignore file if present'));
 
-      const startTime = Date.now();
-      const result = await runHandler(
-        selectedHandler.path,
-        selectedHandler.method,
-        eventData,
-        {},
-        handlerOptions
-      );
-      const duration = Date.now() - startTime;
+      // Scan handlers - this will trigger AWS SDK warnings
+      const handlers = scanForHandlers(process.cwd(), ['.js', '.ts'], scanOptions);
 
-      console.log(chalk.green(`\nExecution completed in ${duration}ms`));
-      console.log(chalk.cyan('--- Result ---'));
-      console.log(JSON.stringify(result, null, 2));
-      console.log('\n');
-    } catch (error) {
-      console.error(chalk.red(`Error running Lambda handler: ${error.message}`));
-      if (error.stack) {
-        console.error(error.stack);
+      if (handlers.length === 0) {
+        console.log(chalk.yellow('No potential handlers found in the current directory'));
+        return;
       }
-      console.log('\n');
-    }
 
-    // Ask if the user wants to test another handler
-    const { runAnother } = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'runAnother',
-        message: 'Would you like to test another handler?',
-        default: true,
-        prefix: chalk.cyan('➤ '),
-        suffix: ' ',
-      },
-    ]);
+      // Prepare handler options
+      const handlerChoices = handlers.flatMap((handler) =>
+        handler.methods.map((method) => ({
+          name: `${path.relative(process.cwd(), handler.path)} -> ${method}`,
+          path: handler.path,
+          method,
+        }))
+      );
 
-    continueRunning = runAnother;
+      // Allow all warnings to be displayed
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-    if (continueRunning) {
-      console.log(chalk.blue('\n----------------------------------------'));
-      console.log(chalk.blue('Starting new test session'));
-      console.log(chalk.blue('----------------------------------------\n'));
+      // -----------------------------------------------------------------
+      // Completely clear the console before displaying the interface
+      // -----------------------------------------------------------------
+      console.clear();
+
+      // Display clean title for selection
+      console.log(chalk.blue('\nSelect a handler (use arrow keys):\n'));
+
+      // Use enquirer with proper response handling
+      const response = await Enquirer.prompt({
+        type: 'select',
+        name: 'selectedHandler',
+        message: '',
+        choices: handlerChoices.map((handler) => ({
+          name: handler.name,
+          value: handler.name,
+        })),
+      });
+
+      // Extract the selected handler
+      const selectedString = response.selectedHandler;
+      const selectedHandler = handlerChoices.find((h) => h.name === selectedString);
+
+      if (!selectedHandler) {
+        throw new Error(`Could not find handler matching: ${selectedString}`);
+      }
+
+      // Use the selected handler
+      const handler = selectedHandler;
+
+      // Load saved events
+      const savedEvents = getEvents();
+
+      // Display the selected handler for clarity
+      console.log(
+        chalk.cyan(
+          `\nSelected handler: ${path.relative(process.cwd(), handler.path)} -> ${handler.method}`
+        )
+      );
+
+      // Ask for event input method - continue using inquirer for the rest
+      const { eventSource } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'eventSource',
+          message: 'How would you like to provide the event?',
+          choices: [
+            { name: 'Load from file', value: 'file' },
+            ...(savedEvents.length > 0 ? [{ name: 'Use saved event', value: 'saved' }] : []),
+            { name: 'Empty event ({})', value: 'empty' },
+            { name: 'Enter JSON manually', value: 'manual' },
+          ],
+          pageSize: 10, // Maximum number of options to show at once
+          loop: false, // Prevent cursor from returning to beginning when reaching the end
+          prefix: chalk.cyan('➤ '),
+          suffix: ' ', // Additional space
+        },
+      ]);
+
+      let eventData = {};
+      let isNewEvent = false; // Indicator to know if it's a new event that could be saved
+
+      // Handle event source selection
+      if (eventSource === 'manual') {
+        // Open the editor directly without using additional inquirer.prompt
+        const editor = require('external-editor');
+        let manualEvent = editor.edit('{\n  \n}');
+
+        try {
+          eventData = JSON.parse(manualEvent);
+          isNewEvent = true; // It's a manually created event, could be saved
+        } catch (error) {
+          console.error(chalk.red(`Invalid JSON: ${error.message}`));
+          continue;
+        }
+      } else if (eventSource === 'file') {
+        const { eventFile } = await inquirer.prompt([
+          {
+            type: 'input',
+            name: 'eventFile',
+            message: 'Enter the path to the event file:',
+            prefix: chalk.cyan('➤ '),
+            suffix: ' ',
+          },
+        ]);
+
+        try {
+          const eventContent = fs.readFileSync(eventFile, 'utf8');
+          eventData = JSON.parse(eventContent);
+          // We don't mark isNewEvent as true since it comes from a file
+        } catch (error) {
+          console.error(chalk.red(`Error loading event file: ${error.message}`));
+          continue;
+        }
+      } else if (eventSource === 'saved') {
+        const { selectedEvent } = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'selectedEvent',
+            message: 'Select a saved event:',
+            choices: savedEvents.map((event) => ({
+              name: `${event.name} (${event.category})`,
+              value: event,
+            })),
+            pageSize: 10,
+            loop: false,
+            prefix: chalk.cyan('➤ '),
+            suffix: ' ',
+          },
+        ]);
+
+        eventData = selectedEvent.data;
+        // We don't mark isNewEvent as true since it comes from a saved event
+      } else if (eventSource === 'empty') {
+        // For empty events, we don't ask if they want to save it
+        eventData = {};
+      }
+
+      // Only ask if you want to save the event if it's new (manual) and has content
+      if (isNewEvent && Object.keys(eventData).length > 0) {
+        console.log(chalk.dim('─────────────────────────────────────'));
+        const { shouldSave } = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'shouldSave',
+            message: 'Do you want to save this event for future use?',
+            default: false,
+            prefix: chalk.cyan('➤ '),
+            suffix: ' ',
+          },
+        ]);
+
+        if (shouldSave) {
+          // Use the direct approach to get the event name
+          const eventName = await readInput('Enter a name for this event', 'my-event');
+          // Show what was entered in cyan color
+          console.log(chalk.cyan(`Event name: ${eventName}`));
+
+          // Use the same direct approach for the category
+          const eventCategory = await readInput('Enter a category (optional)', 'default');
+          console.log(chalk.cyan(`Event category: ${eventCategory}`));
+
+          // Save the event with the collected data
+          saveEvent(eventName, eventData, eventCategory);
+          console.log(chalk.green(`Event saved as: ${eventName} in category: ${eventCategory}`));
+        }
+      }
+
+      // Run the handler
+      console.log(chalk.yellow('\nRunning Lambda handler...'));
+
+      try {
+        // Handler options
+        const handlerOptions = {
+          loadEnv: true, // In interactive mode, always load environment variables
+        };
+
+        console.log(chalk.blue('Loading environment variables from .env file if present'));
+
+        const startTime = Date.now();
+        const result = await runHandler(
+          handler.path,
+          handler.method,
+          eventData,
+          {},
+          handlerOptions
+        );
+        const duration = Date.now() - startTime;
+
+        console.log(chalk.green(`\nExecution completed in ${duration}ms`));
+        console.log(chalk.cyan('--- Result ---'));
+        console.log(JSON.stringify(result, null, 2));
+        console.log('\n');
+      } catch (error) {
+        console.error(chalk.red(`Error running Lambda handler: ${error.message}`));
+        if (error.stack) {
+          console.error(error.stack);
+        }
+        console.log('\n');
+      }
+
+      // Ask if the user wants to test another handler
+      const { runAnother } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'runAnother',
+          message: 'Would you like to test another handler?',
+          default: true,
+          prefix: chalk.cyan('➤ '),
+          suffix: ' ',
+        },
+      ]);
+
+      continueRunning = runAnother;
+
+      if (continueRunning) {
+        console.log(chalk.blue('\n----------------------------------------'));
+        console.log(chalk.blue('Starting new test session'));
+        console.log(chalk.blue('----------------------------------------\n'));
+      }
+    } catch (error) {
+      console.error(chalk.red(`Error: ${error.message}`));
+      console.error(error.stack);
+      process.exit(1);
     }
   }
 
