@@ -24,14 +24,29 @@ function runCommand(command) {
 }
 
 // Create readline interface for user input
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
+let rl;
+
+// Initialize readline interface
+function initReadline() {
+  if (!rl || rl.closed) {
+    rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+  }
+}
+
+// Close readline interface
+function closeReadline() {
+  if (rl && !rl.closed) {
+    rl.close();
+  }
+}
 
 // Prompt for user input
 function prompt(question) {
   return new Promise((resolve) => {
+    initReadline(); // Ensure we have an active readline interface
     rl.question(question, (answer) => {
       resolve(answer);
     });
@@ -40,6 +55,26 @@ function prompt(question) {
 
 // Main release function
 async function release() {
+  // Define promptForReleaseNotes function at function body root
+  async function promptForReleaseNotes(newVersion) {
+    console.log('\nPlease enter release notes (enter an empty line to finish):');
+    let notes = '';
+
+    const collectNotes = async () => {
+      let line = await prompt('> ');
+      if (line.trim() === '') {
+        console.log('\nRelease notes saved.');
+        // Don't close rl here, we'll need it later
+        continueRelease(newVersion, notes);
+        return;
+      }
+      notes += line + '\n';
+      collectNotes();
+    };
+
+    collectNotes();
+  }
+
   try {
     // Check for uncommitted changes
     try {
@@ -48,7 +83,7 @@ async function release() {
       const answer = await prompt('You have uncommitted changes. Continue anyway? (y/n): ');
       if (answer.toLowerCase() !== 'y') {
         console.log('Release cancelled.');
-        rl.close();
+        closeReadline();
         return;
       }
     }
@@ -98,7 +133,7 @@ async function release() {
 
     if (confirmVersion.toLowerCase() !== 'y') {
       console.log('Release cancelled.');
-      rl.close();
+      closeReadline();
       return;
     }
 
@@ -107,26 +142,44 @@ async function release() {
     fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n');
     console.log(`Updated package.json to version ${newVersion}`);
 
-    // Ask for release notes
-    console.log('\nPlease enter release notes (enter an empty line to finish):');
+    // Check if release notes file already exists
+    const releaseDir = path.join(process.cwd(), 'releases');
+    const releaseNotesPath = path.join(releaseDir, `v${newVersion}.md`);
     let releaseNotes = '';
 
-    const collectNotes = async () => {
-      let line = await prompt('> ');
-      if (line.trim() === '') {
-        console.log('\nRelease notes saved.');
-        rl.close();
-        continueRelease(newVersion, releaseNotes);
+    if (fs.existsSync(releaseNotesPath)) {
+      // Use existing release notes file
+      console.log(`\nFound existing release notes at ${releaseNotesPath}`);
+      releaseNotes = fs.readFileSync(releaseNotesPath, 'utf8');
+
+      // Extract content after the header
+      const contentMatch = releaseNotes.match(/# Version [^\n]*\n\n([\s\S]*)/);
+      if (contentMatch && contentMatch[1]) {
+        releaseNotes = contentMatch[1];
+      }
+
+      console.log('\nRelease notes content:');
+      console.log('---------------------');
+      console.log(releaseNotes);
+      console.log('---------------------');
+
+      const useExistingNotes = await prompt('\nUse these release notes? (y/n): ');
+      if (useExistingNotes.toLowerCase() !== 'y') {
+        // If user doesn't want to use existing notes, prompt for them
+        await promptForReleaseNotes(newVersion);
         return;
       }
-      releaseNotes += line + '\n';
-      collectNotes();
-    };
 
-    collectNotes();
+      // Continue with existing notes
+      continueRelease(newVersion, releaseNotes);
+    } else {
+      // If release notes file doesn't exist, create it
+      console.log(`\nNo release notes found for version ${newVersion}.`);
+      await promptForReleaseNotes(newVersion);
+    }
   } catch (error) {
     console.error('Error during release process:', error);
-    rl.close();
+    closeReadline(); // Close readline on error
   }
 }
 
@@ -140,8 +193,12 @@ async function continueRelease(newVersion, releaseNotes) {
     }
 
     const releaseNotesPath = path.join(releaseDir, `v${newVersion}.md`);
-    fs.writeFileSync(releaseNotesPath, `# Version ${newVersion}\n\n${releaseNotes}`);
-    console.log(`Release notes saved to ${releaseNotesPath}`);
+
+    // Only write the file if it doesn't already exist or we collected new notes
+    if (!fs.existsSync(releaseNotesPath) || releaseNotes.trim() !== '') {
+      fs.writeFileSync(releaseNotesPath, `# Version ${newVersion}\n\n${releaseNotes}`);
+      console.log(`Release notes saved to ${releaseNotesPath}`);
+    }
 
     // Run build script
     console.log('\nBuilding the package...');
@@ -184,6 +241,8 @@ async function continueRelease(newVersion, releaseNotes) {
     console.log(`\n🎉 Successfully released version ${newVersion}!`);
   } catch (error) {
     console.error('Error during release process:', error);
+  } finally {
+    closeReadline(); // Always close readline when finished
   }
 }
 
