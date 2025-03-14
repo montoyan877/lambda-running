@@ -113,7 +113,25 @@ function ensurePackageInstalled(packageName, isDev = false, cwd = process.cwd())
  */
 async function ensureDependencies(options = {}) {
   const rootDir = options.rootDir || process.cwd();
-  const uiDir = options.uiDir || path.join(rootDir, 'ui');
+  
+  // Try different possible UI directory locations
+  let uiDir = options.uiDir;
+  if (!uiDir) {
+    // First try the standard location
+    uiDir = path.join(rootDir, 'ui');
+    
+    // If not found, try to find from the module location (npm install case)
+    if (!fs.existsSync(uiDir)) {
+      const moduleRoot = findModuleRoot();
+      if (moduleRoot) {
+        const npmUiDir = path.join(moduleRoot, 'ui');
+        if (fs.existsSync(npmUiDir)) {
+          uiDir = npmUiDir;
+          console.log(chalk.green(`Found UI directory at: ${uiDir}`));
+        }
+      }
+    }
+  }
 
   console.log(chalk.blue('Checking required dependencies...'));
 
@@ -124,7 +142,7 @@ async function ensureDependencies(options = {}) {
   ensurePackageInstalled('ts-node', false, rootDir);
   ensurePackageInstalled('tsconfig-paths', false, rootDir);
 
-  // Only check UI dependencies if running in development mode, not from a linked package
+  // Only check UI dependencies if the UI directory exists
   if (fs.existsSync(uiDir)) {
     // Check if UI dependencies folder exists
     const uiNodeModulesPath = path.join(uiDir, 'node_modules');
@@ -152,6 +170,8 @@ async function ensureDependencies(options = {}) {
   } else {
     console.log(chalk.yellow('UI directory not found, assuming executing in linked mode'));
   }
+  
+  return { uiDir };
 }
 
 /**
@@ -357,31 +377,22 @@ async function startLambdaEnv(options = {}) {
   // Set default options
   const rootDir = options.rootDir || process.cwd();
 
-  // Determine if we're running in a linked project or directly in the package
-  const moduleRootDir = findModuleRoot();
-
-  // Determine the UI directory, which could be in the module root if we're linked
-  const uiDir =
-    options.uiDir ||
-    (fs.existsSync(path.join(rootDir, 'ui'))
-      ? path.join(rootDir, 'ui')
-      : path.join(moduleRootDir, 'ui'));
-
-  // Determine the lambda-run.js path
-  const lambdaRunnerPath = options.lambdaRunnerPath || path.join(__dirname, 'lambda-run.js');
+  // Print banner if enabled
   const printBanner = options.printBanner !== false;
-
-  // Array to store child processes for cleanup
-  const childProcesses = [];
-
   if (printBanner) {
     console.log(chalk.cyan('==================================================='));
     console.log(chalk.cyan('  Lambda Runner - UI Server Startup'));
     console.log(chalk.cyan('==================================================='));
   }
 
-  // Check and install dependencies
-  await ensureDependencies({ rootDir, uiDir });
+  // Ensure required dependencies are installed
+  const { uiDir } = await ensureDependencies({ rootDir, uiDir: options.uiDir });
+
+  // Determine the lambda-run.js path
+  const lambdaRunnerPath = options.lambdaRunnerPath || path.join(__dirname, 'lambda-run.js');
+
+  // Array to store child processes for cleanup
+  const childProcesses = [];
 
   // Find an available port for the API server, starting from 3000
   let apiPort;
@@ -524,12 +535,9 @@ if (require.main === module) {
 // Export functions for use in other files
 module.exports = {
   startLambdaEnv,
-  findAvailablePort,
-  ensureDependencies,
   startApiServer,
   startUiServer,
-  startProcess,
-  setupTerminationHandler,
-  isPortInUse,
-  attemptToFreePort,
+  findAvailablePort,
+  ensureDependencies,
+  findModuleRoot
 };
