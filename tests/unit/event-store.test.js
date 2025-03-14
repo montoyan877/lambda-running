@@ -184,9 +184,18 @@ describe('Event Store', () => {
 
       // Should return some events
       expect(events.length).toBeGreaterThan(0);
-      expect(events[0].name).toBe('test-event');
-      expect(events[0].category).toBe('default');
-      expect(events[0].data).toEqual({ test: 'data' });
+      
+      // Find events by name rather than assuming specific order
+      const testEvent = events.find(e => e.name === 'test-event');
+      const anotherEvent = events.find(e => e.name === 'another-event');
+      
+      // Verify test-event exists and has correct properties
+      expect(testEvent).toBeDefined();
+      expect(testEvent.category).toBe('default');
+      expect(testEvent.data).toEqual({ test: 'data' });
+      
+      // Verify another-event exists
+      expect(anotherEvent).toBeDefined();
     });
 
     test('should filter events by category when specified', () => {
