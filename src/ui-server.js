@@ -11,6 +11,7 @@ const cors = require('cors');
 const chalk = require('chalk');
 const { scanForHandlers, runHandler } = require('./lambda-runner');
 const { saveEvent, getEvents, getEvent, deleteEvent } = require('./event-store');
+const path = require('path');
 
 // Create an Express application
 const app = express();
@@ -172,7 +173,13 @@ async function start(options = {}) {
         useIgnoreFile: true,
       });
 
-      res.json({ handlers });
+      // Transform paths to be relative to cwd
+      const handlersWithRelativePaths = handlers.map(handler => ({
+        ...handler,
+        path: path.relative(cwd, handler.path).replace(/\\/g, '/') // Convert Windows backslashes to forward slashes
+      }));
+
+      res.json({ handlers: handlersWithRelativePaths });
     } catch (error) {
       res.status(500).json({
         error: 'Failed to scan for handlers',

@@ -6,7 +6,7 @@
         <div>
           <h1 class="text-xl font-bold">Handler Testing</h1>
           <p v-if="currentHandler" class="text-sm text-gray-400 mt-1">
-            {{ currentHandler.path.split('/').pop() }} -> {{ currentHandler.method }}
+            {{ currentHandler.relativePath || getRelativePath(currentHandler.path) }} -> {{ currentHandler.method }}
           </p>
         </div>
         
@@ -318,6 +318,21 @@ export default defineComponent({
       }
     };
     
+    const getRelativePath = (path) => {
+      if (!path) return '';
+      
+      // Dividir la ruta y obtener las últimas partes
+      const parts = path.split(/[\/\\]/);
+      
+      // Si hay más de 2 partes, mostrar 'parent/file.js'
+      if (parts.length > 2) {
+        return `${parts[parts.length - 2]}/${parts[parts.length - 1]}`; 
+      }
+      
+      // Si hay solo 1 o 2 partes, mostrar solo el nombre del archivo
+      return parts[parts.length - 1];
+    };
+    
     return {
       // Refs
       eventEditor,
@@ -340,7 +355,8 @@ export default defineComponent({
       formatEvent,
       selectEvent,
       clearLogs,
-      saveEvent
+      saveEvent,
+      getRelativePath
     };
   }
 });

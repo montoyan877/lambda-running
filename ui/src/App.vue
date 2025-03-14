@@ -10,14 +10,7 @@
       
       <!-- Navigation -->
       <nav class="flex-1 overflow-y-auto p-2">
-        <router-link to="/" class="sidebar-item mb-1" active-class="active" exact>
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
-          </svg>
-          Dashboard
-        </router-link>
-        
-        <div class="mt-4 mb-2">
+        <div class="mb-2">
           <div class="px-3 mb-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
             Handlers
           </div>
@@ -56,18 +49,16 @@
             </div>
           </template>
         </div>
-        
-        <router-link to="/events" class="sidebar-item mt-4" active-class="active">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-          </svg>
-          Events
-        </router-link>
       </nav>
       
-      <!-- Footer -->
-      <div class="p-3 border-t border-dark-border text-xs text-gray-500">
-        Lambda Running v{{ version }}
+      <!-- Footer with handler count -->
+      <div class="p-3 border-t border-dark-border">
+        <div class="text-xs text-gray-500 flex justify-between items-center">
+          <span>Lambda Running v{{ version }}</span>
+          <span v-if="totalHandlerCount > 0" class="px-2 py-1 bg-dark-200 rounded-md text-primary-500 text-xs font-medium">
+            {{ totalHandlerCount }} Handlers
+          </span>
+        </div>
       </div>
     </aside>
     
@@ -132,11 +123,19 @@ export default defineComponent({
       executionStore.disconnectSocket()
     })
     
+    // Compute total number of handlers
+    const totalHandlerCount = computed(() => {
+      return handlersStore.handlers.reduce((count, handler) => {
+        return count + handler.methods.length
+      }, 0)
+    })
+    
     return {
       version: '0.1.0',
       isLoadingHandlers: computed(() => handlersStore.isLoading),
       handlerError: computed(() => handlersStore.error),
       groupedHandlers: computed(() => handlersStore.groupedHandlers),
+      totalHandlerCount,
       isInitializing,
       hasCompletedInitialLoad
     }

@@ -21,22 +21,32 @@ export const useHandlersStore = defineStore('handlers', {
       const grouped = {}
       
       state.handlers.forEach(handler => {
-        const relativePath = handler.path
-        const pathParts = relativePath.split('/').filter(Boolean)
+        // Extraer solo el nombre del archivo y el directorio inmediato
+        const parts = handler.path.split(/[\/\\]/)
+        const fileName = parts[parts.length - 1]
         
-        // Group by top-level directory
-        const topDir = pathParts[0] || 'Other'
+        // Use the immediate parent directory as the group
+        const parentDir = parts.length > 1 ? parts[parts.length - 2] : 'Other'
         
-        if (!grouped[topDir]) {
-          grouped[topDir] = []
+        if (!grouped[parentDir]) {
+          grouped[parentDir] = []
         }
         
         handler.methods.forEach(method => {
-          grouped[topDir].push({
-            name: `${relativePath} -> ${method}`,
+          // Create a more user-friendly display name
+          const displayName = `${fileName} -> ${method}`
+          
+          // Create a more user-friendly relative path for display
+          const relativePath = parts.length > 2 
+            ? `${parentDir}/${fileName}`
+            : fileName
+          
+          grouped[parentDir].push({
+            name: displayName,
             path: handler.path,
+            relativePath: relativePath,
             method,
-            directory: topDir
+            directory: parentDir
           })
         })
       })
@@ -67,7 +77,27 @@ export const useHandlersStore = defineStore('handlers', {
     },
     
     setActiveHandler(path, method) {
-      this.activeHandler = { path, method }
+      this.activeHandler = { 
+        path, 
+        method,
+        // Add relative path calculation
+        relativePath: this.getRelativePath(path)
+      }
+    },
+    
+    getRelativePath(path) {
+      if (!path) return '';
+      
+      // Split path and get relevant parts
+      const parts = path.split(/[\/\\]/);
+      
+      // If there are more than 2 parts, show 'parent/file.js'
+      if (parts.length > 2) {
+        return `${parts[parts.length - 2]}/${parts[parts.length - 1]}`; 
+      }
+      
+      // If there are only 1 or 2 parts, just show the filename
+      return parts[parts.length - 1];
     }
   }
 }) 
