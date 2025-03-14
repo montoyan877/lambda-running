@@ -41,6 +41,8 @@ export const useExecutionStore = defineStore('execution', {
       this.socket.on('console', (data) => {
         const { sessionId, type, message, timestamp } = data;
         
+        console.log(`Debug - Received console event for session ${sessionId}:`, { type, message });
+        
         if (!sessionId) return;
         
         // Create session if it doesn't exist
@@ -49,6 +51,7 @@ export const useExecutionStore = defineStore('execution', {
             logs: [],
             result: null
           };
+          console.log(`Debug - Created new session: ${sessionId}`);
         }
         
         this.sessions[sessionId].logs.push({
@@ -56,6 +59,8 @@ export const useExecutionStore = defineStore('execution', {
           message: message || '',
           timestamp: new Date(timestamp) || Date.now()
         });
+        
+        console.log(`Debug - Session ${sessionId} now has ${this.sessions[sessionId].logs.length} logs`);
       });
       
       this.socket.on('execution-result', (data) => {
@@ -185,9 +190,11 @@ export const useExecutionStore = defineStore('execution', {
     
     getSessionLogs(sessionId) {
       if (!this.sessions[sessionId]) {
+        console.log(`Debug - No session found for ID: ${sessionId}`);
         return [];
       }
       
+      console.log(`Debug - getSessionLogs for ${sessionId}:`, this.sessions[sessionId].logs.length, "logs available");
       return this.sessions[sessionId].logs;
     },
     
@@ -203,6 +210,25 @@ export const useExecutionStore = defineStore('execution', {
       if (this.sessions[sessionId]) {
         this.sessions[sessionId].logs = [];
       }
+    },
+    
+    setErrorResult(sessionId, error, duration = 0) {
+      if (!this.sessions[sessionId]) {
+        this.sessions[sessionId] = {
+          logs: [],
+          result: null
+        };
+      }
+      
+      this.sessions[sessionId].result = {
+        error,
+        result: null,
+        success: false,
+        duration: duration
+      };
+      
+      // También indicamos que la ejecución ha terminado
+      this.isExecuting = false;
     }
   }
 }) 

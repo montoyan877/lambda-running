@@ -138,7 +138,9 @@ function loadEnvFile(directory) {
     const envFilePath = path.join(directory, '.env');
 
     if (fs.existsSync(envFilePath)) {
-      console.log(`Loading environment variables from ${envFilePath}`);
+      global.systemLog ? global.systemLog(`Loading environment variables from ${envFilePath}`) : 
+        console.log(`Loading environment variables from ${envFilePath}`);
+      
       const content = fs.readFileSync(envFilePath, 'utf8');
       const lines = content
         .split('\n')
@@ -165,10 +167,24 @@ function loadEnvFile(directory) {
       }
     }
   } catch (error) {
-    console.warn('Could not read .env file:', error.message);
+    global.systemLog ? global.systemLog(`Could not read .env file: ${error.message}`) : 
+      console.warn('Could not read .env file:', error.message);
   }
 
   return envVars;
+}
+
+// Añadir función global para facilitar el logueo explícito para Lambda Running
+function setupGlobalLogging() {
+  // Función global para imprimir logs explícitos de Lambda
+  global.lambdaLog = (...args) => {
+    console.log(`[LAMBDA] ${args.join(' ')}`);
+  };
+  
+  // Función global para imprimir logs de sistema (que serán filtrados y no aparecerán en el Output)
+  global.systemLog = (...args) => {
+    console.info(`[SYSTEM] ${args.join(' ')}`);
+  };
 }
 
 /**
@@ -183,11 +199,17 @@ function loadEnvFile(directory) {
  */
 async function runHandler(handlerPath, handlerMethod, event, context = {}, options = {}) {
   try {
+    // Configurar funciones globales de logging
+    setupGlobalLogging();
+    
     // Set default options
     const opts = {
       loadEnv: true,
       ...options,
     };
+
+    // Log de sistema usando systemLog - no será visible en el Output
+    global.systemLog(`Starting execution of handler: ${handlerPath} -> ${handlerMethod}`);
 
     // Resolve the absolute path if it's relative
     const absolutePath = path.isAbsolute(handlerPath)
@@ -225,11 +247,7 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
       const dirTsConfigPath = path.join(handlerDir, 'tsconfig.json');
       if (fs.existsSync(dirTsConfigPath) && path.dirname(absolutePath) !== process.cwd()) {
         const chalk = require('chalk');
-        console.log(
-          chalk.green(`Using TypeScript configuration from handler directory: ${dirTsConfigPath}`)
-        );
-        // We don't re-register ts-node here as it's already registered globally,
-        // but we log to inform the user that the handler directory's config will apply
+        global.systemLog(`Using TypeScript configuration from handler directory: ${dirTsConfigPath}`);
       }
     }
 
@@ -259,9 +277,21 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
     };
 
     // Execute the handler
-    return await handler[handlerMethod](event, defaultContext);
+    global.systemLog('Executing handler...');
+    const startTime = Date.now();
+    const result = await handler[handlerMethod](event, defaultContext);
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    
+    global.systemLog(`Handler returned result: ${JSON.stringify(result, null, 2)}`);
+    global.systemLog(`Execution completed in ${duration}ms`);
+    return result;
   } catch (error) {
-    console.error('Error running Lambda handler:', error);
+    // También usar systemLog para los mensajes de error para que no se muestren en el Output
+    global.systemLog(`Error: ${error.message}`);
+    global.systemLog(`Error details: ${error.stack}`);
+    // Pero mantenemos el console.error para que el error se propague adecuadamente al sistema
+    console.error(`Error: ${error.message}`);
     throw error;
   }
 }
@@ -327,7 +357,9 @@ function scanDirectory(directory, extensions, ignorePatterns) {
             // Check if it's a TypeScript file and ts-node is not available
             const isTypeScript = ext === '.ts';
             if (isTypeScript && !tsNodeAvailable) {
-              console.warn(`Skipping TypeScript file (ts-node not available): ${filePath}`);
+              global.systemLog ? 
+                global.systemLog(`Skipping TypeScript file (ts-node not available): ${filePath}`) : 
+                console.warn(`Skipping TypeScript file (ts-node not available): ${filePath}`);
               continue;
             }
 
@@ -347,13 +379,17 @@ function scanDirectory(directory, extensions, ignorePatterns) {
             }
           } catch (error) {
             // Skip files that can't be required
-            console.warn(`Could not load potential handler: ${filePath}`, error.message);
+            global.systemLog ? 
+              global.systemLog(`Could not load potential handler: ${filePath} - ${error.message}`) : 
+              console.warn(`Could not load potential handler: ${filePath}`, error.message);
           }
         }
       }
     }
   } catch (error) {
-    console.error(`Error scanning directory ${directory}:`, error);
+    global.systemLog ? 
+      global.systemLog(`Error scanning directory ${directory}: ${error.message}`) : 
+      console.error(`Error scanning directory ${directory}:`, error);
   }
 
   return results;

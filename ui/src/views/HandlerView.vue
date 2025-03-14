@@ -164,7 +164,7 @@
                       {{ currentResult.success ? 'Success' : 'Failed' }}
                     </span>
                     <span class="text-gray-400 ml-2">
-                      {{ currentResult.duration }}ms
+                      {{ formatDuration(currentResult.duration) }}
                     </span>
                   </div>
                 </div>
@@ -172,7 +172,7 @@
                 <div class="flex-1 overflow-hidden">
                   <CodeEditor
                     v-if="currentResult"
-                    :modelValue="JSON.stringify(currentResult.result || currentResult.error, null, 2)"
+                    :modelValue="formatResultOutput(currentResult)"
                     language="json"
                     theme="dark"
                     :readOnly="true"
@@ -329,7 +329,9 @@ export default defineComponent({
     
     const currentLogs = computed(() => {
       if (!currentSessionId.value) return [];
-      return executionStore.getSessionLogs(currentSessionId.value);
+      const logs = executionStore.getSessionLogs(currentSessionId.value);
+      console.log(`Debug - Current logs for session ${currentSessionId.value}:`, logs);
+      return logs;
     });
     
     const currentResult = computed(() => {
@@ -354,6 +356,28 @@ export default defineComponent({
         }
       }
     });
+    
+    // Watch for fatal errors in logs and add them to result if not already set
+    watch(() => currentLogs.value, (newLogs) => {
+      // Si hay logs de error pero no hay resultado (error fatal antes de resultado)
+      if (newLogs.length > 0 && !currentResult.value && currentSessionId.value) {
+        const errorLogs = newLogs.filter(log => log.type === 'error');
+        
+        if (errorLogs.length > 0) {
+          // Creamos un resultado con el error
+          const errorMessages = errorLogs.map(log => log.message).join('\n');
+          
+          // Solo agregamos el resultado si no existe
+          if (!executionStore.getSessionResult(currentSessionId.value)) {
+            executionStore.setErrorResult(
+              currentSessionId.value, 
+              { message: 'Fatal error', details: errorMessages },
+              Date.now() - errorLogs[0].timestamp // Calcular duración aproximada
+            );
+          }
+        }
+      }
+    }, { deep: true });
     
     // Methods
     const runHandler = async () => {
@@ -426,6 +450,43 @@ export default defineComponent({
       }
     };
     
+    // Formatear el resultado para mostrarlo
+    const formatResultOutput = (result) => {
+      try {
+        if (!result) return '{}';
+
+        if (result.error) {
+          // Si es un objeto de error, formatear para mejor visualización
+          let errorObj = result.error;
+          if (typeof errorObj === 'string') {
+            errorObj = { message: errorObj };
+          }
+          
+          // Si tiene detalles, agregarlos
+          if (errorObj.details) {
+            errorObj.details = errorObj.details.split('\n');
+          }
+          
+          return JSON.stringify(errorObj, null, 2);
+        } else {
+          // Si es un resultado exitoso
+          return JSON.stringify(result.result || {}, null, 2);
+        }
+      } catch (e) {
+        return JSON.stringify({ error: "Error formatting result" }, null, 2);
+      }
+    };
+    
+    // Formatear duración para mostrarla en segundos
+    const formatDuration = (duration) => {
+      if (duration < 1000) {
+        return `${duration}ms`;
+      } else {
+        const seconds = (duration / 1000).toFixed(2);
+        return `${seconds}s`;
+      }
+    };
+    
     const getRelativePath = (path) => {
       if (!path) return '';
       
@@ -469,6 +530,8 @@ export default defineComponent({
       selectEvent,
       clearLogs,
       handleSaveEvent,
+      formatDuration,
+      formatResultOutput,
       getRelativePath,
       toggleEventOptions
     };

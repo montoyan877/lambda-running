@@ -22,6 +22,22 @@ let io;
 let isRunning = false;
 let port = 3000;
 
+// Configurar funciones globales de logging
+function setupGlobalLogging() {
+  // Función global para imprimir logs explícitos de Lambda
+  global.lambdaLog = (...args) => {
+    console.log(`[LAMBDA] ${args.join(' ')}`);
+  };
+  
+  // Función global para imprimir logs de sistema (que serán filtrados y no aparecerán en el Output)
+  global.systemLog = (...args) => {
+    console.info(`[SYSTEM] ${args.join(' ')}`);
+  };
+}
+
+// Inicializar las funciones globales de logging
+setupGlobalLogging();
+
 // Handle console output capture for streaming to UI
 class OutputCapture {
   constructor(socket, sessionId) {
@@ -31,37 +47,149 @@ class OutputCapture {
     this.originalConsoleError = console.error;
     this.originalConsoleWarn = console.warn;
     this.originalConsoleInfo = console.info;
+    
+    // Flag para marcar cuando estamos en modo captura
+    this.isCapturing = false;
+    
+    // Flag para identificar si estamos en código de handler o librería
+    this.inHandlerCode = false;
+    
+    // Lista de logs del sistema que deberíamos ignorar
+    this.systemLogs = [
+      'Starting execution of handler:',
+      'Loading environment variables from',
+      'Execution started',
+      'Execution completed',
+      'Handler returned result:',
+      'Auth token refreshed',
+      'Using TypeScript configuration',
+      'Executing handler',
+      'Socket connected',
+      'Socket disconnected',
+      'Client connected to UI',
+      'Client disconnected from UI',
+      'Lambda Running UI server',
+      'UI server is already running',
+      'transpileOnly',
+      'require.resolve',
+      'ts-node',
+      'tsconfig',
+      'Event data:',
+      'Execution completed in',
+      'Starting execution of',
+      'Error details:',
+      'Error:',
+      'Starting lambda-running',
+      'Could not open browser',
+      'UI available at',
+      'Scanned for handlers',
+      'Ignoring file',
+      'Processing file',
+      'Import resolver',
+      'AWS SDK',
+      'Lambda Running'
+    ];
   }
 
   start() {
-    // Override console methods to capture output
+    // Activar captura
+    this.isCapturing = true;
+    
+    // Emitir mensaje de inicio
+    this.emit('info', ['Lambda execution started']);
+    
+    // Sobrescribir métodos de consola para capturar todo durante la ejecución
     console.log = (...args) => {
       this.originalConsoleLog(...args);
-      this.emit('log', args);
+      this.processLog('log', args);
     };
 
     console.error = (...args) => {
       this.originalConsoleError(...args);
-      this.emit('error', args);
+      this.processLog('error', args);
     };
 
     console.warn = (...args) => {
       this.originalConsoleWarn(...args);
-      this.emit('warn', args);
+      this.processLog('warn', args);
     };
 
     console.info = (...args) => {
       this.originalConsoleInfo(...args);
-      this.emit('info', args);
+      this.processLog('info', args);
     };
   }
 
   stop() {
-    // Restore original console methods
+    // Desactivar captura
+    this.isCapturing = false;
+    
+    // Restaurar métodos originales
     console.log = this.originalConsoleLog;
     console.error = this.originalConsoleError;
     console.warn = this.originalConsoleWarn;
     console.info = this.originalConsoleInfo;
+  }
+  
+  // Método para procesar logs y filtrar los que son del sistema
+  processLog(type, args) {
+    if (!this.isCapturing) return;
+    
+    // Si es un log del sistema, no lo emitimos en absoluto
+    if (this.isSystemLog(args)) {
+      return;
+    }
+    
+    // Si llegamos aquí, el log es de la lambda y debemos emitirlo
+    this.emit(type, args);
+  }
+  
+  // Método para determinar si un log es del sistema
+  isSystemLog(args) {
+    if (args.length === 0) return false;
+    
+    // Verificar si cualquiera de los strings en systemLogs está en el primer argumento
+    const firstArg = String(args[0]);
+    
+    // Si el log comienza con [SYSTEM], es un log de sistema y debe ser filtrado
+    if (typeof firstArg === 'string' && firstArg.startsWith('[SYSTEM]')) {
+      return true;
+    }
+    
+    // Si el log comienza con [LAMBDA], no es del sistema (es un log explícito del usuario)
+    if (typeof firstArg === 'string' && firstArg.startsWith('[LAMBDA]')) {
+      // Quitamos el prefijo para que se vea más limpio
+      args[0] = firstArg.substring('[LAMBDA]'.length).trim();
+      return false;
+    }
+    
+    // Si el mensaje proviene de un handler lambda, permitirlo
+    if (this.inHandlerCode) {
+      return false;
+    }
+    
+    // Verificar contra patrones conocidos de logs del sistema
+    for (const systemLogPrefix of this.systemLogs) {
+      if (typeof firstArg === 'string' && firstArg.includes(systemLogPrefix)) {
+        return true;
+      }
+    }
+    
+    // Patrones adicionales basados en análisis de logs
+    // Verificar si es un log interno de la librería
+    if (
+      (typeof firstArg === 'string' && /^\[.*?\]/.test(firstArg) && !firstArg.startsWith('[LAMBDA]')) ||  // Logs con formato [ALGO] que no sea [LAMBDA]
+      firstArg.includes('lambda-running') ||
+      firstArg.includes('Lambda Running') ||
+      firstArg.includes('node_modules') || 
+      firstArg.includes('Starting') || 
+      firstArg.includes('Importing') || 
+      firstArg.includes('Loading')
+    ) {
+      return true;
+    }
+    
+    return false;
   }
 
   emit(type, args) {
@@ -77,9 +205,11 @@ class OutputCapture {
       return String(arg);
     });
 
+    const message = formattedArgs.join(' ');
+    
     this.socket.emit('console', {
       type,
-      message: formattedArgs.join(' '),
+      message,
       timestamp: new Date().toISOString(),
       sessionId: this.sessionId,
     });
@@ -89,7 +219,7 @@ class OutputCapture {
 // Start the UI server
 async function start(options = {}) {
   if (isRunning) {
-    console.log(chalk.yellow('UI server is already running.'));
+    global.systemLog('UI server is already running.');
     return;
   }
 
@@ -311,7 +441,7 @@ async function start(options = {}) {
 
   // Socket.io connection handling
   io.on('connection', (socket) => {
-    console.log(chalk.green('Client connected to UI'));
+    global.systemLog('Client connected to UI');
     
     // Store the current execution context to allow cancellation
     let currentExecutionContext = null;
@@ -334,12 +464,22 @@ async function start(options = {}) {
       try {
         socket.emit('execution-start', { sessionId });
 
+        // Mensaje de inicio de ejecución - usando systemLog para que no aparezca en Output
+        global.systemLog(`Starting execution of ${path.basename(handlerPath)} -> ${handlerMethod}`);
+        
         const startTime = Date.now();
         
         // Allow the execution to be canceled
         if (currentExecutionContext.canceled) {
           throw new Error('Execution canceled by user');
         }
+        
+        // Mostrar información del evento (usando systemLog)
+        global.systemLog(`Event data: ${JSON.stringify(eventData || {}, null, 2)}`);
+        
+        // Aquí comienza la ejecución real del handler del usuario
+        // Marcar que estamos dentro del código del handler
+        outputCapture.inHandlerCode = true;
         
         const result = await runHandler(
           handlerPath,
@@ -350,6 +490,10 @@ async function start(options = {}) {
             loadEnv: true,
           }
         );
+        
+        // Al terminar la ejecución, volvemos a estar en código de librería
+        outputCapture.inHandlerCode = false;
+        
         const duration = Date.now() - startTime;
         
         // Check if execution was canceled during the run
@@ -357,6 +501,10 @@ async function start(options = {}) {
           throw new Error('Execution canceled by user');
         }
 
+        // Mensaje de finalización exitosa (usando systemLog)
+        global.systemLog(`Execution completed in ${(duration / 1000).toFixed(2)}s`);
+        global.systemLog('Execution completed successfully');
+        
         socket.emit('execution-result', {
           success: true,
           result,
@@ -366,8 +514,35 @@ async function start(options = {}) {
       } catch (error) {
         // Check if this was a cancellation
         if (currentExecutionContext && currentExecutionContext.canceled) {
+          // Mensaje de cancelación
+          global.systemLog('Execution was cancelled by user');
           socket.emit('execution-stopped', { sessionId });
         } else {
+          // Marcar que estamos de vuelta en código de librería
+          outputCapture.inHandlerCode = false;
+          
+          // Para garantizar que los errores se muestren en el output,
+          // enviamos el error directamente al terminal con el formato adecuado
+          socket.emit('console', {
+            type: 'error',
+            message: `Error: ${error.message}`,
+            timestamp: new Date().toISOString(),
+            sessionId
+          });
+          
+          // Si hay stack trace, enviarlo también
+          if (error.stack) {
+            socket.emit('console', {
+              type: 'error',
+              message: error.stack,
+              timestamp: new Date().toISOString(),
+              sessionId
+            });
+          }
+          
+          // Mensaje de error (usando systemLog)
+          global.systemLog(`Execution failed: ${error.message}`);
+          
           socket.emit('execution-result', {
             success: false,
             error: {
@@ -398,7 +573,7 @@ async function start(options = {}) {
         // Send an immediate console message
         socket.emit('console', {
           type: 'warn',
-          message: 'Execution canceled by user',
+          message: 'Execution was stopped by user',
           timestamp: Date.now(),
           sessionId
         });
@@ -409,7 +584,7 @@ async function start(options = {}) {
     });
 
     socket.on('disconnect', () => {
-      console.log(chalk.yellow('Client disconnected from UI'));
+      global.systemLog('Client disconnected from UI');
     });
   });
 
@@ -417,7 +592,7 @@ async function start(options = {}) {
   return new Promise((resolve, reject) => {
     server.listen(port, () => {
       isRunning = true;
-      console.log(chalk.green(`Lambda Running UI server started on http://localhost:${port}`));
+      global.systemLog(`Lambda Running UI server started on http://localhost:${port}`);
 
       if (options.open) {
         open(`http://localhost:${port}`);
@@ -430,9 +605,9 @@ async function start(options = {}) {
       isRunning = false;
 
       if (error.code === 'EADDRINUSE') {
-        console.error(chalk.red(`Port ${port} is already in use. Try a different port.`));
+        global.systemLog(`Port ${port} is already in use. Try a different port.`);
       } else {
-        console.error(chalk.red(`Failed to start UI server: ${error.message}`));
+        global.systemLog(`Failed to start UI server: ${error.message}`);
       }
 
       reject(error);
@@ -449,7 +624,7 @@ async function stop() {
   return new Promise((resolve) => {
     server.close(() => {
       isRunning = false;
-      console.log(chalk.yellow('Lambda Running UI server stopped'));
+      global.systemLog('Lambda Running UI server stopped');
       resolve();
     });
   });
