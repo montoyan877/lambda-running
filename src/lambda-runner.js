@@ -279,7 +279,50 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
     // Execute the handler
     global.systemLog('Executing handler...');
     const startTime = Date.now();
-    const result = await handler[handlerMethod](event, defaultContext);
+    
+    // Ejecutar el handler dentro de un try-catch para capturar errores
+    let result;
+    try {
+      result = await handler[handlerMethod](event, defaultContext);
+    } catch (handlerError) {
+      // Para las excepciones que ocurren durante la ejecución del handler,
+      // necesitamos asegurarnos de capturar el nombre exacto de la excepción
+      
+      if (handlerError instanceof Error) {
+        // Capturar el nombre exacto de la clase de error
+        // Hacemos el log de una manera especial para que se preserve el nombre de la clase
+        console.log(`${handlerError.constructor.name || handlerError.name || 'Error'} [Error]`);
+        
+        // Logueamos el stack trace si existe, o el mensaje de error si no hay stack
+        if (handlerError.stack) {
+          console.log(handlerError.stack.split('\n').slice(1).join('\n'));
+        } else if (handlerError.message) {
+          console.log(handlerError.message);
+        }
+        
+        // Detalles adicionales solo en logs del sistema
+        global.systemLog(`Error interceptado: ${handlerError.constructor.name || handlerError.name}: ${handlerError.message}`);
+        
+        // Si el error tiene propiedades adicionales, mostrarlas solo en los logs del sistema
+        const errorProps = {};
+        for (const key in handlerError) {
+          if (key !== 'name' && key !== 'message' && key !== 'stack' && typeof handlerError[key] !== 'function') {
+            errorProps[key] = handlerError[key];
+          }
+        }
+        
+        if (Object.keys(errorProps).length > 0) {
+          global.systemLog('Error additional details:', errorProps);
+        }
+      } else {
+        // Si no es un Error, loguearlo tal cual
+        console.log(handlerError);
+      }
+      
+      // Re-lanzar el error para que se maneje adecuadamente
+      throw handlerError;
+    }
+    
     const endTime = Date.now();
     const duration = endTime - startTime;
     
@@ -290,8 +333,8 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
     // También usar systemLog para los mensajes de error para que no se muestren en el Output
     global.systemLog(`Error: ${error.message}`);
     global.systemLog(`Error details: ${error.stack}`);
-    // Pero mantenemos el console.error para que el error se propague adecuadamente al sistema
-    console.error(`Error: ${error.message}`);
+    
+    // Asegurarnos de que el error se propague para ser manejado por quien llamó a esta función
     throw error;
   }
 }

@@ -140,6 +140,46 @@ class OutputCapture {
       return;
     }
     
+    // Verificar si el primer argumento es un objeto Error (incluyendo excepciones como AuthenticationException)
+    if (args.length > 0 && args[0] instanceof Error) {
+      const error = args[0];
+      // Obtenemos el nombre real de la clase de error usando constructor.name que es más fiable
+      const errorName = error.constructor.name || error.name || 'Error';
+      
+      // Emitir el nombre de la excepción con formato especial
+      this.emit('error', [`${errorName} [Error]`]);
+      
+      // Emitir el stack trace sin la primera línea (que contiene el nombre y mensaje)
+      if (error.stack) {
+        const stackLines = error.stack.split('\n');
+        // Solo emitir las líneas del stack sin la primera que ya contiene el error
+        if (stackLines.length > 1) {
+          this.emit('error', [stackLines.slice(1).join('\n')]);
+        }
+      } else if (error.message) {
+        this.emit('error', [error.message]);
+      }
+      return;
+    }
+    
+    // Capturas específicas para errores y excepciones - debemos asegurarnos de mostrarlos siempre
+    if (type === 'error' && args.length > 0) {
+      // Si el primer argumento es una cadena que contiene un error específico o stack trace, 
+      // asegurarnos de mostrarlo incluso si contiene patrones de sistema
+      const firstArg = String(args[0]);
+      
+      // Detectar patrones específicos de errores y excepciones
+      if (firstArg.includes('Error') || 
+          firstArg.includes('Exception') ||
+          firstArg.includes('at ') || // Líneas de stack trace
+          firstArg.includes('Failed') ||
+          firstArg.includes('Uncaught') ||
+          /^\s+at\s/.test(firstArg)) { // Líneas de stack trace con indentación
+        this.emit('error', args);
+        return;
+      }
+    }
+    
     // Si llegamos aquí, el log es de la lambda y debemos emitirlo
     this.emit(type, args);
   }
@@ -148,12 +188,26 @@ class OutputCapture {
   isSystemLog(args) {
     if (args.length === 0) return false;
     
-    // Verificar si cualquiera de los strings en systemLogs está en el primer argumento
+    // Si el primer argumento es un Error, NUNCA debe ser considerado un log del sistema
+    if (args[0] instanceof Error) {
+      return false;
+    }
+    
+    // Obtener el primer argumento como string para evaluarlo
     const firstArg = String(args[0]);
     
     // Si el log comienza con [SYSTEM], es un log de sistema y debe ser filtrado
     if (typeof firstArg === 'string' && firstArg.startsWith('[SYSTEM]')) {
       return true;
+    }
+    
+    // Los errores y excepciones nunca deben ser considerados logs del sistema
+    if (typeof firstArg === 'string' && 
+        (firstArg.includes('Error') || 
+         firstArg.includes('Exception') || 
+         firstArg.includes('at ') ||  // Para detectar líneas de stack trace
+         /^\s+at\s/.test(firstArg))) {  // Para detectar líneas de stack trace con indentación
+      return false;
     }
     
     // Si el log comienza con [LAMBDA], no es del sistema (es un log explícito del usuario)
@@ -195,21 +249,56 @@ class OutputCapture {
   emit(type, args) {
     // Format and emit log messages to the client
     const formattedArgs = args.map((arg) => {
-      if (typeof arg === 'object') {
+      // No intentar JSON.stringify en objetos Error
+      if (typeof arg === 'object' && arg !== null && !(arg instanceof Error)) {
         try {
           return JSON.stringify(arg, null, 2);
         } catch (e) {
           return String(arg);
         }
       }
+      
+      // Convertir a string preservando el formato original
       return String(arg);
     });
 
-    const message = formattedArgs.join(' ');
+    // Combinar argumentos en un mensaje
+    let message = formattedArgs.join(' ');
+    
+    // Eliminar TODOS los timestamps en CUALQUIER formato
+    message = message.replace(/\[\d{2}:\d{2}:\d{2}\]\s*/g, '');       // [HH:MM:SS]
+    message = message.replace(/\d{2}:\d{2}:\d{2}\s*/g, '');           // HH:MM:SS sin corchetes
+    message = message.replace(/^\s*Error\s*$/i, '');                  // Solo la palabra "Error" sola
+    
+    // Si después de limpiar el mensaje queda vacío, no enviarlo
+    if (!message.trim()) {
+      return;
+    }
+    
+    // Detectar si es un mensaje de excepción para aplicar formato especial
+    let errorClass = '';
+    
+    // Detectar diferentes tipos de mensajes de error
+    if (type === 'error') {
+      // Encontrar el tipo de mensaje de error
+      if (message.includes('[Error]')) {
+        // Es una línea con el nombre de la excepción
+        errorClass = 'error-message-heading';
+      } 
+      else if (message.trim().startsWith('at ') || /^\s+at\s/.test(message)) {
+        // Es una línea de stack trace
+        errorClass = 'stack-trace';
+      }
+      else {
+        // Mensaje de error genérico
+        errorClass = 'error-message';
+      }
+    }
     
     this.socket.emit('console', {
       type,
       message,
+      errorClass,
       timestamp: new Date().toISOString(),
       sessionId: this.sessionId,
     });
@@ -267,6 +356,51 @@ async function start(options = {}) {
             font-style: italic;
             color: #888;
           }
+          /* Estilos para mensajes de error */
+          .error-message {
+            color: #ff5252;
+            font-weight: bold;
+            white-space: pre-wrap;
+            font-family: monospace;
+            text-align: left;
+            padding: 10px;
+            background-color: rgba(255, 0, 0, 0.05);
+            border-left: 4px solid #ff5252;
+            margin: 8px 0;
+            overflow-x: auto;
+            display: block;
+            width: calc(100% - 20px);
+          }
+          
+          /* Enfatizar la línea con el nombre de la excepción */
+          .error-message-heading {
+            color: #ff3333;
+            font-size: 1.2em;
+            font-weight: bold;
+            font-family: monospace;
+            background-color: rgba(255, 0, 0, 0.1);
+            padding: 12px 10px;
+            margin: 15px 0 0 0;
+            border-left: 4px solid #ff3333;
+            border-top-left-radius: 3px;
+            border-top-right-radius: 3px;
+            text-align: left;
+            display: block;
+          }
+          
+          /* Stack trace con formato adecuado */
+          .stack-trace {
+            white-space: pre;
+            font-family: monospace;
+            color: #ff7777;
+            margin: 0;
+            padding: 5px 10px 5px 20px;
+            font-size: 0.9em;
+            background-color: rgba(255, 0, 0, 0.03);
+            border-left: 4px solid rgba(255, 82, 82, 0.5);
+            text-align: left;
+            display: block;
+          }
         </style>
       </head>
       <body>
@@ -278,9 +412,78 @@ async function start(options = {}) {
           // Simple script to connect to WebSocket for basic demo
           const socket = new WebSocket('ws://' + window.location.host + '/socket.io/?EIO=4&transport=websocket');
           
+          // Contenedor principal para los mensajes
+          let outputContainer;
+          
           socket.onopen = () => {
             console.log('Connected to server');
-            document.querySelector('.loading').textContent = 'Connected to server! Full UI coming soon.';
+            const loadingElement = document.querySelector('.loading');
+            loadingElement.textContent = 'Connected to server! Full UI coming soon.';
+            
+            // Crear un contenedor específico para la salida
+            outputContainer = document.createElement('div');
+            outputContainer.className = 'output-container';
+            outputContainer.style.cssText = 'width: 100%; max-width: 900px; text-align: left; margin-top: 20px; padding: 10px; background-color: #2d2d2d; border-radius: 4px; overflow: auto; max-height: 70vh;';
+            loadingElement.parentNode.insertBefore(outputContainer, loadingElement.nextSibling);
+            
+            // Escuchar eventos de consola
+            socket.addEventListener('message', (event) => {
+              try {
+                const data = JSON.parse(event.data);
+                
+                // Procesar eventos de consola
+                if (data.type === 'console') {
+                  const consoleData = data.data;
+                  
+                  // Eliminar cualquier timestamp que pueda tener el mensaje
+                  let message = consoleData.message;
+                  message = message.replace(/\[\d{2}:\d{2}:\d{2}\]\s*/g, '');    // [HH:MM:SS]
+                  message = message.replace(/\d{2}:\d{2}:\d{2}\s*/g, '');        // HH:MM:SS sin corchetes
+                  message = message.replace(/^\s*Error\s*$/i, '');               // Solo la palabra "Error" sola
+                  
+                  // Si después de limpiar el mensaje queda vacío, ignorarlo
+                  if (!message.trim()) return;
+                  
+                  // Crear elemento de mensaje
+                  const messageEl = document.createElement('div');
+                  
+                  // Aplicar la clase CSS específica si viene del servidor
+                  if (consoleData.errorClass) {
+                    messageEl.className = consoleData.errorClass;
+                  } 
+                  // O determinar el tipo de mensaje basado en su contenido
+                  else if (consoleData.type === 'error') {
+                    // Por defecto, todo mensaje de error tiene la clase base
+                    messageEl.className = 'error-message';
+                    
+                    // Detectar tipos específicos de errores
+                    if (message.includes('[Error]') || 
+                        /^[A-Z][a-zA-Z]+Exception/.test(message)) {
+                      // Es una línea con el nombre de la excepción
+                      messageEl.className = 'error-message-heading';
+                    } 
+                    else if (message.trim().startsWith('at ') || 
+                            /^\s+at\s/.test(message) ||
+                            (message.includes('.ts:') && message.includes(':')) ||
+                            (message.includes('.js:') && message.includes(':'))) {
+                      // Es una línea de stack trace
+                      messageEl.className = 'stack-trace';
+                    }
+                  }
+                  
+                  // Establecer el texto del mensaje
+                  messageEl.textContent = message;
+                  
+                  // Añadir al contenedor
+                  outputContainer.appendChild(messageEl);
+                  
+                  // Auto-scroll hasta el último mensaje
+                  outputContainer.scrollTop = outputContainer.scrollHeight;
+                }
+              } catch (e) {
+                console.error('Error parsing message:', e);
+              }
+            });
           };
           
           socket.onclose = () => {
@@ -481,15 +684,52 @@ async function start(options = {}) {
         // Marcar que estamos dentro del código del handler
         outputCapture.inHandlerCode = true;
         
-        const result = await runHandler(
-          handlerPath,
-          handlerMethod,
-          eventData || {},
-          {},
-          {
-            loadEnv: true,
+        let result;
+        try {
+          result = await runHandler(
+            handlerPath,
+            handlerMethod,
+            eventData || {},
+            {},
+            {
+              loadEnv: true,
+            }
+          );
+        } catch (handlerError) {
+          // Capturar explícitamente el error del handler y procesarlo
+          
+          // Loguear directamente el error para asegurar que se muestre en el Output
+          console.log("ERROR DETECTADO EN LAMBDA:");
+          
+          // Si es un objeto Error, mostrar todos sus detalles
+          if (handlerError instanceof Error) {
+            console.log(`ERROR: ${handlerError.name || 'Error'}: ${handlerError.message}`);
+            
+            // Para errores como AuthenticationException, sus propiedades podrían ser relevantes
+            // Mostramos todas las propiedades enumerables del error
+            const errorProps = Object.keys(handlerError)
+              .filter(key => key !== 'name' && key !== 'message' && key !== 'stack')
+              .reduce((obj, key) => {
+                obj[key] = handlerError[key];
+                return obj;
+              }, {});
+              
+            if (Object.keys(errorProps).length > 0) {
+              console.log("Error properties:", errorProps);
+            }
+            
+            // Imprimir el stack trace completo
+            if (handlerError.stack) {
+              console.log(handlerError.stack);
+            }
+          } else {
+            // Si no es un objeto Error, mostrarlo tal cual
+            console.log(handlerError);
           }
-        );
+          
+          // Re-lanzar para el manejo posterior
+          throw handlerError;
+        }
         
         // Al terminar la ejecución, volvemos a estar en código de librería
         outputCapture.inHandlerCode = false;
@@ -521,11 +761,15 @@ async function start(options = {}) {
           // Marcar que estamos de vuelta en código de librería
           outputCapture.inHandlerCode = false;
           
+          // Emitir explícitamente el mensaje de error
+          console.log(`Error en la ejecución: ${error.message}`);
+          
           // Para garantizar que los errores se muestren en el output,
           // enviamos el error directamente al terminal con el formato adecuado
           socket.emit('console', {
             type: 'error',
             message: `Error: ${error.message}`,
+            errorClass: 'error-message',
             timestamp: new Date().toISOString(),
             sessionId
           });
@@ -535,6 +779,18 @@ async function start(options = {}) {
             socket.emit('console', {
               type: 'error',
               message: error.stack,
+              errorClass: 'error-message',
+              timestamp: new Date().toISOString(),
+              sessionId
+            });
+          }
+          
+          // Si es un error específico como AuthenticationException, asegurarnos de capturarlo
+          if (error.name && error.name !== 'Error') {
+            socket.emit('console', {
+              type: 'error',
+              message: `Exception: ${error.name}: ${error.message}`,
+              errorClass: 'error-message',
               timestamp: new Date().toISOString(),
               sessionId
             });
