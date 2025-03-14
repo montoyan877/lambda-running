@@ -15,6 +15,15 @@ const Enquirer = require('enquirer');
 const { runHandler, scanForHandlers } = require('../src/lambda-runner');
 const { saveEvent, getEvents, getEvent, deleteEvent } = require('../src/event-store');
 
+// Import UI server module
+let uiServer;
+try {
+  uiServer = require('../src/ui-server');
+} catch (e) {
+  // We'll check for existence more explicitly in the UI command
+  // UI server is optional, so we'll gracefully handle missing dependency
+}
+
 const program = new Command();
 
 // Set up the CLI
@@ -217,13 +226,106 @@ program
     }
   });
 
+// UI server only mode (internal command to prevent recursion)
+program
+  .command('ui-server')
+  .description('Launch only the API server for the UI (internal command)')
+  .option('-p, --port <port>', 'Port to run the UI server on', '3000')
+  .option('--no-open', 'Do not automatically open browser')
+  .action(async (options) => {
+    try {
+      // Check if we're already in a recursive call
+      if (process.env.LAMBDA_UI_NO_RECURSION !== 'true') {
+        console.error(
+          chalk.red('This command should not be called directly. Use "lambda-run ui" instead.')
+        );
+        process.exit(1);
+      }
+
+      // Try to require ui-server if not already loaded
+      if (!uiServer) {
+        try {
+          uiServer = require('../src/ui-server');
+        } catch (e) {
+          // Check if ui-server.js file exists
+          const uiServerPath = path.join(__dirname, '../src/ui-server.js');
+          if (!fs.existsSync(uiServerPath)) {
+            console.error(
+              chalk.red('UI server module not found. The file src/ui-server.js is missing.')
+            );
+            process.exit(1);
+          }
+
+          // If file exists but still fails, it might be missing dependencies
+          console.error(chalk.red('UI dependencies not found. Run "npm install" to install them.'));
+          process.exit(1);
+        }
+      }
+
+      console.log(chalk.blue('Starting Lambda Running UI server...'));
+
+      // Start UI server directly
+      await uiServer.start({
+        port: parseInt(options.port, 10),
+        open: options.open !== false,
+        cwd: process.cwd(),
+      });
+
+      console.log(
+        chalk.green(`Lambda Running UI server started on http://localhost:${options.port}`)
+      );
+
+      // Keep the process running
+      process.stdin.resume();
+
+      // Handle Ctrl+C
+      process.on('SIGINT', () => {
+        console.log(chalk.yellow('\nShutting down UI server...'));
+        process.exit(0);
+      });
+    } catch (error) {
+      console.error(chalk.red(`Error starting UI server: ${error.message}`));
+      console.error(error.stack);
+      process.exit(1);
+    }
+  });
+
+// UI mode
+program
+  .command('ui')
+  .description('Launch interactive web UI for testing Lambda functions')
+  .option('-p, --port <port>', 'Port to run the UI server on', '3000')
+  .option('--no-open', 'Do not automatically open browser')
+  .action(async () => {
+    try {
+      // Check if we're in a recursive call to prevent infinite loops
+      if (process.env.LAMBDA_UI_RECURSION_CHECK === 'true') {
+        console.error(chalk.red('Detected recursive call to lambda-run ui. This is likely a bug.'));
+        process.exit(1);
+      }
+
+      // Import the uiStart module with all the enhanced functionality
+      const uiStart = require('./ui-start');
+
+      // Use the enhanced startLambdaEnv function from ui-start.js
+      await uiStart.startLambdaEnv({
+        rootDir: process.cwd(),
+        lambdaRunnerPath: path.join(__dirname, 'lambda-run.js'),
+        printBanner: true,
+      });
+
+      // Note: The startLambdaEnv function already handles SIGINT and process cleanup
+    } catch (error) {
+      console.error(chalk.red(`Error starting UI server: ${error.message}`));
+      console.error(error.stack);
+      process.exit(1);
+    }
+  });
+
 // Helper function for input in the most basic way possible
 function readInput(prompt, defaultValue = '') {
   return new Promise((resolve) => {
     process.stdout.write(`${prompt}${defaultValue ? ' (' + defaultValue + ')' : ''}: `);
-
-    // Array to store chunks
-    const inputChunks = [];
 
     // Handle input
     process.stdin.resume();

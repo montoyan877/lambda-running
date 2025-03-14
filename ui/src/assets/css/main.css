@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom CSS for Lambda Running UI */
+@layer base {
+  html, body, #app {
+    @apply h-full font-sans text-white antialiased;
+    background-color: #0f131a;
+  }
+  
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-dark-300 bg-opacity-30 rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-dark-300 rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-dark-hover;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-dark-100 rounded-lg shadow-lg overflow-hidden p-5;
+  }
+  
+  .card-title {
+    @apply text-lg font-medium text-white mb-2;
+  }
+  
+  .sidebar-item {
+    @apply flex items-center px-3 py-2 rounded-md text-gray-200 hover:bg-dark-hover transition-colors;
+  }
+  
+  .sidebar-item.active {
+    @apply bg-primary-500 bg-opacity-10 text-primary-500;
+  }
+  
+  .input {
+    @apply w-full px-3 py-2 bg-dark-200 border border-dark-border rounded-md focus:outline-none focus:border-primary-500 transition-colors text-white;
+  }
+  
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-dark-100 focus:ring-primary-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .btn-primary {
+    @apply bg-primary-500 hover:bg-primary-600 text-white;
+  }
+  
+  .btn-secondary {
+    @apply bg-secondary-500 hover:bg-secondary-600 text-white;
+  }
+  
+  .btn-outline {
+    @apply border-gray-600 text-gray-300 hover:bg-dark-hover;
+  }
+  
+  .btn-sm {
+    @apply px-3 py-1.5 text-sm;
+  }
+  
+  .terminal-container {
+    @apply font-mono text-sm bg-terminal-background text-terminal-foreground rounded-md overflow-hidden;
+  }
+}
+
+/* Dark Mode Colors */
+:root {
+  --color-dark-100: #1a1f2d;
+  --color-dark-200: #151921;
+  --color-dark-300: #22283b;
+  --color-dark-hover: #242c44;
+  --color-dark-border: #2d334d;
+  
+  --color-primary-500: #6366f1;
+  --color-primary-600: #4f46e5;
+  
+  --color-secondary-500: #64748b;
+  --color-secondary-600: #475569;
+} 

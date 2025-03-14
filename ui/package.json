@@ -1,0 +1,31 @@
+{
+  "name": "lambda-running-ui",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "serve": "vite preview"
+  },
+  "dependencies": {
+    "axios": "^1.5.0",
+    "monaco-editor": "^0.44.0",
+    "pinia": "^2.1.6",
+    "socket.io-client": "^4.7.2",
+    "vue": "^3.3.4",
+    "vue-router": "^4.2.4",
+    "xterm": "^5.3.0",
+    "xterm-addon-fit": "^0.8.0",
+    "xterm-addon-web-links": "^0.9.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.14",
+    "@vitejs/plugin-vue": "^4.3.4",
+    "autoprefixer": "^10.4.15",
+    "eslint": "^9.22.0",
+    "eslint-plugin-vue": "^10.0.0",
+    "postcss": "^8.4.29",
+    "tailwindcss": "^3.3.3",
+    "vite": "^4.4.9"
+  }
+}

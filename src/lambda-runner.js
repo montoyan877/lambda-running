@@ -10,63 +10,70 @@ const fs = require('fs');
 let tsNodeAvailable = false;
 let tsconfigPathsAvailable = false;
 
-try {
-  require.resolve('ts-node');
-  tsNodeAvailable = true;
+// Skip TS check if environment variable is set (for development mode)
+const skipTsCheck = process.env.SKIP_TS_CHECK === 'true';
 
-  // Check if tsconfig-paths is installed for alias support
+if (!skipTsCheck) {
   try {
-    require.resolve('tsconfig-paths');
-    tsconfigPathsAvailable = true;
-  } catch (err) {
-    console.warn('Path aliases not supported. Install tsconfig-paths if needed.');
-    tsconfigPathsAvailable = false;
-  }
+    require.resolve('ts-node');
+    tsNodeAvailable = true;
 
-  // Look for project's tsconfig.json
-  const projectTsConfigPath = path.join(process.cwd(), 'tsconfig.json');
-  let tsNodeOptions = {
-    transpileOnly: true,
-    compilerOptions: {
-      module: 'commonjs',
-      target: 'es2017',
-    },
-  };
-
-  // If project has a tsconfig.json, use it instead of default options
-  if (fs.existsSync(projectTsConfigPath)) {
-    const chalk = require('chalk');
-    console.log(chalk.green(`Using TypeScript configuration from ${projectTsConfigPath}`));
-    // ts-node will automatically pick up the tsconfig.json from the project root
-    // We still set transpileOnly for better performance
-    tsNodeOptions = { transpileOnly: true };
-
-    // Register tsconfig-paths if available to support path aliases
-    if (tsconfigPathsAvailable) {
-      // Load the tsconfig manually to check for path aliases
-      let tsconfig;
-      try {
-        tsconfig = JSON.parse(fs.readFileSync(projectTsConfigPath, 'utf8'));
-        if (tsconfig.compilerOptions && tsconfig.compilerOptions.paths) {
-          // Register tsconfig-paths
-          require('tsconfig-paths').register({
-            baseUrl: tsconfig.compilerOptions.baseUrl || '.',
-            paths: tsconfig.compilerOptions.paths,
-          });
-        }
-      } catch (e) {
-        console.warn(`Error parsing tsconfig.json: ${e.message}`);
-      }
+    // Check if tsconfig-paths is installed for alias support
+    try {
+      require.resolve('tsconfig-paths');
+      tsconfigPathsAvailable = true;
+    } catch (err) {
+      console.warn('Path aliases not supported. Install tsconfig-paths if needed.');
+      tsconfigPathsAvailable = false;
     }
-  } else {
-    console.log('No tsconfig.json found, using default TypeScript configuration');
-  }
 
-  // Register ts-node to import .ts files
-  require('ts-node').register(tsNodeOptions);
-} catch (err) {
-  // ts-node is not installed, continue without it
-  console.warn(`ts-node not found: ${err.message}`);
+    // Look for project's tsconfig.json
+    const projectTsConfigPath = path.join(process.cwd(), 'tsconfig.json');
+    let tsNodeOptions = {
+      transpileOnly: true,
+      compilerOptions: {
+        module: 'commonjs',
+        target: 'es2017',
+      },
+    };
+
+    // If project has a tsconfig.json, use it instead of default options
+    if (fs.existsSync(projectTsConfigPath)) {
+      const chalk = require('chalk');
+      console.log(chalk.green(`Using TypeScript configuration from ${projectTsConfigPath}`));
+      // ts-node will automatically pick up the tsconfig.json from the project root
+      // We still set transpileOnly for better performance
+      tsNodeOptions = { transpileOnly: true };
+
+      // Register tsconfig-paths if available to support path aliases
+      if (tsconfigPathsAvailable) {
+        // Load the tsconfig manually to check for path aliases
+        let tsconfig;
+        try {
+          tsconfig = JSON.parse(fs.readFileSync(projectTsConfigPath, 'utf8'));
+          if (tsconfig.compilerOptions && tsconfig.compilerOptions.paths) {
+            // Register tsconfig-paths
+            require('tsconfig-paths').register({
+              baseUrl: tsconfig.compilerOptions.baseUrl || '.',
+              paths: tsconfig.compilerOptions.paths,
+            });
+          }
+        } catch (e) {
+          console.warn(`Error parsing tsconfig.json: ${e.message}`);
+        }
+      }
+    } else {
+      console.log('No tsconfig.json found, using default TypeScript configuration');
+    }
+
+    // Register ts-node to import .ts files
+    require('ts-node').register(tsNodeOptions);
+  } catch (err) {
+    // ts-node is not installed, continue without it
+    console.warn(`ts-node not found: ${err.message}`);
+  }
+} else {
+  console.log('Skipping TypeScript setup as SKIP_TS_CHECK is true');
 }
 
 /**
