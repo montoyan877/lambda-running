@@ -1,6 +1,6 @@
 # Lambda Running
 
-![Version](https://img.shields.io/badge/version-0.1.4-blue.svg)
+![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 > A powerful library for running and testing AWS Lambda functions locally with custom events.
