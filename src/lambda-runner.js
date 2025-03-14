@@ -174,14 +174,14 @@ function loadEnvFile(directory) {
   return envVars;
 }
 
-// Añadir función global para facilitar el logueo explícito para Lambda Running
+// Add global function to facilitate explicit logging for Lambda Running
 function setupGlobalLogging() {
-  // Función global para imprimir logs explícitos de Lambda
+  // Global function to print explicit Lambda logs
   global.lambdaLog = (...args) => {
     console.log(`[LAMBDA] ${args.join(' ')}`);
   };
   
-  // Función global para imprimir logs de sistema (que serán filtrados y no aparecerán en el Output)
+  // Global function to print system logs (which will be filtered and won't appear in the Output)
   global.systemLog = (...args) => {
     console.info(`[SYSTEM] ${args.join(' ')}`);
   };
@@ -276,34 +276,30 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
       ...context,
     };
 
-    // Execute the handler
-    global.systemLog('Executing handler...');
-    const startTime = Date.now();
-    
-    // Ejecutar el handler dentro de un try-catch para capturar errores
+    // Execute the handler inside a try-catch to capture errors
     let result;
     try {
       result = await handler[handlerMethod](event, defaultContext);
     } catch (handlerError) {
-      // Para las excepciones que ocurren durante la ejecución del handler,
-      // necesitamos asegurarnos de capturar el nombre exacto de la excepción
+      // For exceptions that occur during handler execution,
+      // we need to ensure we capture the exact name of the exception
       
       if (handlerError instanceof Error) {
         // Capturar el nombre exacto de la clase de error
         // Hacemos el log de una manera especial para que se preserve el nombre de la clase
         console.log(`${handlerError.constructor.name || handlerError.name || 'Error'} [Error]`);
         
-        // Logueamos el stack trace si existe, o el mensaje de error si no hay stack
+        // Log the stack trace if it exists, or the error message if there's no stack
         if (handlerError.stack) {
           console.log(handlerError.stack.split('\n').slice(1).join('\n'));
         } else if (handlerError.message) {
           console.log(handlerError.message);
         }
         
-        // Detalles adicionales solo en logs del sistema
-        global.systemLog(`Error interceptado: ${handlerError.constructor.name || handlerError.name}: ${handlerError.message}`);
+        // Additional details only in system logs
+        global.systemLog(`Error intercepted: ${handlerError.constructor.name || handlerError.name}: ${handlerError.message}`);
         
-        // Si el error tiene propiedades adicionales, mostrarlas solo en los logs del sistema
+        // If the error has additional properties, show them only in system logs
         const errorProps = {};
         for (const key in handlerError) {
           if (key !== 'name' && key !== 'message' && key !== 'stack' && typeof handlerError[key] !== 'function') {
@@ -315,11 +311,11 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
           global.systemLog('Error additional details:', errorProps);
         }
       } else {
-        // Si no es un Error, loguearlo tal cual
+        // If it's not an Error, log it as is
         console.log(handlerError);
       }
       
-      // Re-lanzar el error para que se maneje adecuadamente
+      // Re-throw the error so it can be handled appropriately
       throw handlerError;
     }
     
@@ -330,11 +326,11 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
     global.systemLog(`Execution completed in ${duration}ms`);
     return result;
   } catch (error) {
-    // También usar systemLog para los mensajes de error para que no se muestren en el Output
+    // Also use systemLog for error messages so they don't appear in the Output
     global.systemLog(`Error: ${error.message}`);
     global.systemLog(`Error details: ${error.stack}`);
     
-    // Asegurarnos de que el error se propague para ser manejado por quien llamó a esta función
+    // Make sure the error is propagated to be handled by whoever called this function
     throw error;
   }
 }

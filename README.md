@@ -1,6 +1,6 @@
 # Lambda Running
 
-![Version](https://img.shields.io/badge/version-0.1.1-blue.svg)
+![Version](https://img.shields.io/badge/version-0.1.4-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 > A powerful library for running and testing AWS Lambda functions locally with custom events.
@@ -10,6 +10,7 @@ Lambda Running provides a seamless local testing environment for your AWS Lambda
 ## ✨ Features
 
 - **Interactive Mode** - Run Lambda functions with an intuitive CLI interface
+- **UI Mode** - Test Lambda functions with a web interface featuring real-time logs and improved error visualization
 - **Custom Event Support** - Test with your own event payloads
 - **Event Management** - Save, load, and reuse event payloads
 - **TypeScript Support** - Test TypeScript Lambda functions using your project's own tsconfig.json, including path aliases (@/\*)
@@ -24,6 +25,7 @@ Lambda Running provides a seamless local testing environment for your AWS Lambda
 - [Installation](#installation)
 - [Usage](#usage)
   - [Interactive Mode](#interactive-mode)
+  - [UI Mode](#ui-mode)
   - [CLI Commands](#cli-commands)
   - [Programmatic API](#programmatic-api)
 - [Configuration](#configuration)
@@ -79,9 +81,38 @@ Interactive mode will:
 5. Optionally save events for future use
 6. Allow you to test another handler or exit
 
+### UI Mode
+
+UI Mode provides a modern web interface for testing your Lambda functions with enhanced visualization and real-time feedback.
+
+To start UI Mode:
+
+```bash
+lambda-run ui
+# or with a custom port
+lambda-run ui --port 3001
+```
+
+UI Mode provides the following benefits:
+
+1. **Visual Interface** - An intuitive web-based UI for executing Lambda functions
+2. **Real-time Logs** - See logs and execution results as they happen
+3. **Enhanced Error Visualization** - Improved formatting and display of error messages and stack traces
+4. **Intelligent Log Filtering** - Automatic separation of system logs from user logs
+5. **Auto-scrolling** - Follows execution output in real-time
+6. **Exception Highlighting** - Better visibility of exception names and stack traces
+
+The UI server runs locally and opens automatically in your default browser. You can keep it running in the background while you develop and test your Lambda functions.
+
 ### CLI Commands
 
 Lambda Running provides several CLI commands for different use cases:
+
+#### Start UI Mode
+
+```bash
+lambda-run ui [--port 3000]
+```
 
 #### Run a specific handler with an event
 
@@ -117,6 +148,7 @@ You can also use Lambda Running programmatically in your Node.js applications:
 
 ```javascript
 const { runHandler, scanForHandlers, saveEvent, getEvents } = require('lambda-running');
+const { start: startUI, stop: stopUI } = require('lambda-running/ui');
 
 // Run a handler
 async function testHandler() {
@@ -132,6 +164,9 @@ console.log(handlers);
 // Save and retrieve events
 saveEvent('myEvent', { key: 'value' }, 'custom-category');
 const events = getEvents();
+
+// Start the UI server programmatically
+startUI({ port: 3000, open: true }); // open: true will open the browser automatically
 ```
 
 ## 📝 Example
@@ -169,6 +204,12 @@ You can test this function interactively:
 lambda-run i
 ```
 
+Or with the UI Mode for enhanced visualization:
+
+```bash
+lambda-run ui
+```
+
 Or directly with the CLI:
 
 ```bash
@@ -189,6 +230,8 @@ Lambda Running supports two types of environment variables:
 
    - `LAMBDA_RUNNING_EVENT_DIR`: Custom directory for saved events (default: `~/.lambda-running/events`)
    - `LAMBDA_RUNNING_TIMEOUT`: Default timeout in milliseconds (default: `30000`)
+   - `LAMBDA_RUNNING_UI_PORT`: Default port for the UI server (default: `3000`)
+   - `LAMBDA_RUNNING_UI_OPEN`: Whether to automatically open the UI in browser (default: `true`)
 
 2. **Function Variables** - Variables passed to your Lambda function from `.env` files:
    - Lambda Running automatically loads variables from a `.env` file in your project root
