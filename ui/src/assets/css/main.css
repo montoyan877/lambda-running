@@ -37,11 +37,11 @@
   }
   
   .sidebar-item {
-    @apply flex items-center px-3 py-2 rounded-md text-gray-200 hover:bg-dark-hover transition-colors;
+    @apply flex items-center px-3 py-2 rounded-md text-gray-200 hover:bg-dark-hover hover:text-white transition-colors;
   }
   
   .sidebar-item.active {
-    @apply bg-primary-500 bg-opacity-10 text-primary-500;
+    @apply bg-primary-500 bg-opacity-10 text-white;
   }
   
   .input {

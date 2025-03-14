@@ -25,7 +25,7 @@
           
           <button 
             class="btn btn-outline text-sm"
-            @click="saveEvent"
+            @click="showSaveEventModal = true"
             :disabled="!eventData || isExecuting"
           >
             Save Event
@@ -35,141 +35,156 @@
     </header>
     
     <!-- Main Content -->
-    <div class="flex-1 flex overflow-hidden">
-      <!-- Event Editor -->
-      <div class="w-1/2 h-full flex flex-col border-r border-dark-border">
-        <div class="p-3 border-b border-dark-border bg-dark-100 flex justify-between items-center">
-          <h2 class="font-medium">Event Data</h2>
-          
-          <div class="flex space-x-2">
-            <button 
-              v-if="showSavedEvents"
-              class="text-xs px-2 py-1 rounded bg-dark-hover hover:bg-dark-300 transition-colors"
-              @click="showSavedEvents = false"
-            >
-              Hide Saved Events
-            </button>
-            <button 
-              v-else
-              class="text-xs px-2 py-1 rounded bg-dark-hover hover:bg-dark-300 transition-colors"
-              @click="showSavedEvents = true"
-            >
-              Show Saved Events
-            </button>
+    <ResizablePanel class="flex-1" :initialSplit="50">
+      <template #left>
+        <!-- Event Editor -->
+        <div class="h-full flex flex-col">
+          <div class="p-3 border-b border-dark-border bg-dark-100 flex justify-between items-center">
+            <h2 class="font-medium">Event Data</h2>
             
-            <button 
-              class="text-xs px-2 py-1 rounded bg-dark-hover hover:bg-dark-300 transition-colors"
-              @click="formatEvent"
-            >
-              Format
-            </button>
-          </div>
-        </div>
-        
-        <div class="flex-1 flex overflow-hidden">
-          <!-- Event Editor -->
-          <div :class="['h-full', showSavedEvents ? 'w-1/2' : 'w-full']">
-            <CodeEditor
-              ref="eventEditor"
-              v-model="eventData"
-              language="json"
-              theme="dark"
-              :options="{
-                formatOnPaste: true,
-                formatOnType: true
-              }"
-              @save="runHandler"
-            />
+            <div class="flex space-x-2">
+              <button 
+                v-if="showSavedEvents"
+                class="text-xs px-2 py-1 rounded bg-dark-hover hover:bg-dark-300 transition-colors"
+                @click="showSavedEvents = false"
+              >
+                Hide Saved Events
+              </button>
+              <button 
+                v-else
+                class="text-xs px-2 py-1 rounded bg-dark-hover hover:bg-dark-300 transition-colors"
+                @click="showSavedEvents = true"
+              >
+                Show Saved Events
+              </button>
+              
+              <button 
+                class="text-xs px-2 py-1 rounded bg-dark-hover hover:bg-dark-300 transition-colors"
+                @click="formatEvent"
+              >
+                Format
+              </button>
+            </div>
           </div>
           
-          <!-- Saved Events Panel -->
-          <div v-if="showSavedEvents" class="w-1/2 h-full overflow-auto bg-dark-200 border-l border-dark-border">
-            <div v-if="isLoadingEvents" class="p-4 text-center text-gray-400">
-              Loading events...
+          <div class="flex-1 flex overflow-hidden">
+            <!-- Event Editor -->
+            <div :class="['h-full', showSavedEvents ? 'w-1/2' : 'w-full']">
+              <CodeEditor
+                ref="eventEditor"
+                v-model="eventData"
+                language="json"
+                theme="dark"
+                :options="{
+                  formatOnPaste: true,
+                  formatOnType: true
+                }"
+                @save="runHandler"
+              />
             </div>
             
-            <div v-else-if="events.length === 0" class="p-4 text-center text-gray-400">
-              No saved events found
-            </div>
-            
-            <div v-else class="p-2">
-              <div v-for="(eventList, category) in eventsByCategory" :key="category" class="mb-4">
-                <h3 class="text-xs font-semibold text-gray-400 uppercase px-2 py-1">{{ category }}</h3>
-                
-                <div 
-                  v-for="event in eventList" 
-                  :key="event.name"
-                  class="px-3 py-2 text-sm hover:bg-dark-hover cursor-pointer rounded transition-colors"
-                  @click="selectEvent(event)"
-                >
-                  {{ event.name }}
-                  <div class="text-xs text-gray-500 mt-1">
-                    {{ new Date(event.timestamp).toLocaleString() }}
+            <!-- Saved Events Panel -->
+            <div v-if="showSavedEvents" class="w-1/2 h-full overflow-auto bg-dark-200 border-l border-dark-border">
+              <div v-if="isLoadingEvents" class="p-4 text-center text-gray-400">
+                Loading events...
+              </div>
+              
+              <div v-else-if="events.length === 0" class="p-4 text-center text-gray-400">
+                No saved events found
+              </div>
+              
+              <div v-else class="p-2">
+                <div v-for="(eventList, category) in eventsByCategory" :key="category" class="mb-4">
+                  <h3 class="text-xs font-semibold text-gray-400 uppercase px-2 py-1">{{ category }}</h3>
+                  
+                  <div 
+                    v-for="event in eventList" 
+                    :key="event.name"
+                    class="px-3 py-2 text-sm hover:bg-dark-hover cursor-pointer rounded transition-colors"
+                    @click="selectEvent(event)"
+                  >
+                    {{ event.name }}
+                    <div class="text-xs text-gray-500 mt-1">
+                      {{ new Date(event.timestamp).toLocaleString() }}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </template>
       
-      <!-- Results Panel -->
-      <div class="w-1/2 h-full flex flex-col">
-        <div class="p-3 border-b border-dark-border bg-dark-100 flex justify-between items-center">
-          <h2 class="font-medium">Output</h2>
-          
-          <div class="flex space-x-2">
-            <button 
-              class="text-xs px-2 py-1 rounded bg-dark-hover hover:bg-dark-300 transition-colors"
-              @click="clearLogs"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
-        
-        <div class="flex-1 flex flex-col overflow-hidden">
-          <!-- Terminal Output -->
-          <div class="h-1/2 overflow-hidden">
-            <Terminal 
-              ref="terminal"
-              :logs="currentLogs"
-            />
-          </div>
-          
-          <!-- Result JSON -->
-          <div class="h-1/2 border-t border-dark-border overflow-hidden">
-            <div class="p-3 border-b border-dark-border bg-dark-100 flex justify-between items-center">
-              <h3 class="font-medium">Result</h3>
-              
-              <div v-if="currentResult" class="text-xs">
-                <span 
-                  :class="currentResult.success ? 'text-green-400' : 'text-red-400'"
-                >
-                  {{ currentResult.success ? 'Success' : 'Failed' }}
-                </span>
-                <span class="text-gray-400 ml-2">
-                  {{ currentResult.duration }}ms
-                </span>
-              </div>
-            </div>
+      <template #right>
+        <!-- Results Panel -->
+        <div class="h-full flex flex-col">
+          <div class="p-3 border-b border-dark-border bg-dark-100 flex justify-between items-center">
+            <h2 class="font-medium">Output</h2>
             
-            <div class="h-[calc(100%-40px)] overflow-hidden">
-              <CodeEditor
-                v-if="currentResult"
-                :modelValue="JSON.stringify(currentResult.result || currentResult.error, null, 2)"
-                language="json"
-                theme="dark"
-                :readOnly="true"
-              />
-              <div v-else class="p-4 text-center text-gray-400 h-full flex items-center justify-center">
-                <p>Run handler to see results</p>
-              </div>
+            <div class="flex space-x-2">
+              <button 
+                class="text-xs px-2 py-1 rounded bg-dark-hover hover:bg-dark-300 transition-colors"
+                @click="clearLogs"
+              >
+                Clear
+              </button>
             </div>
           </div>
+          
+          <ResizablePanelVertical class="flex-1" :initialSplit="50">
+            <template #top>
+              <!-- Terminal Output -->
+              <div class="h-full overflow-hidden">
+                <Terminal 
+                  ref="terminal"
+                  :logs="currentLogs"
+                />
+              </div>
+            </template>
+            
+            <template #bottom>
+              <!-- Result JSON -->
+              <div class="h-full overflow-hidden flex flex-col">
+                <div class="p-3 border-b border-dark-border bg-dark-100 flex justify-between items-center">
+                  <h3 class="font-medium">Result</h3>
+                  
+                  <div v-if="currentResult" class="text-xs">
+                    <span 
+                      :class="currentResult.success ? 'text-green-400' : 'text-red-400'"
+                    >
+                      {{ currentResult.success ? 'Success' : 'Failed' }}
+                    </span>
+                    <span class="text-gray-400 ml-2">
+                      {{ currentResult.duration }}ms
+                    </span>
+                  </div>
+                </div>
+                
+                <div class="flex-1 overflow-hidden">
+                  <CodeEditor
+                    v-if="currentResult"
+                    :modelValue="JSON.stringify(currentResult.result || currentResult.error, null, 2)"
+                    language="json"
+                    theme="dark"
+                    :readOnly="true"
+                  />
+                  <div v-else class="p-4 text-center text-gray-400 h-full flex items-center justify-center">
+                    <p>Run handler to see results</p>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </ResizablePanelVertical>
         </div>
-      </div>
-    </div>
+      </template>
+    </ResizablePanel>
+    
+    <!-- Save Event Modal -->
+    <SaveEventModal
+      :show="showSaveEventModal"
+      @close="showSaveEventModal = false"
+      @save="handleSaveEvent"
+    />
   </div>
 </template>
 
@@ -181,13 +196,20 @@ import { useEventsStore } from '../stores/events';
 import { useExecutionStore } from '../stores/execution';
 import CodeEditor from '../components/CodeEditor.vue';
 import Terminal from '../components/Terminal.vue';
+import ResizablePanel from '../components/ResizablePanel.vue';
+import ResizablePanelVertical from '../components/ResizablePanelVertical.vue';
+import SaveEventModal from '../components/SaveEventModal.vue';
+import { notify } from '../components/Notification.vue';
 
 export default defineComponent({
   name: 'HandlerView',
   
   components: {
     CodeEditor,
-    Terminal
+    Terminal,
+    ResizablePanel,
+    ResizablePanelVertical,
+    SaveEventModal
   },
   
   setup() {
@@ -203,6 +225,7 @@ export default defineComponent({
     const eventData = ref('{}');
     const showSavedEvents = ref(false);
     const currentSessionId = ref(null);
+    const showSaveEventModal = ref(false);
     
     // On mount, initialize
     onMounted(() => {
@@ -268,7 +291,7 @@ export default defineComponent({
           parsedEvent
         );
       } catch (error) {
-        alert(`Invalid JSON event data: ${error.message}`);
+        notify.error(`Invalid JSON event data: ${error.message}`);
       }
     };
     
@@ -293,28 +316,25 @@ export default defineComponent({
       }
     };
     
-    const saveEvent = async () => {
-      if (!eventData.value) return;
-      
+    const handleSaveEvent = async (eventInfo) => {
       try {
         const parsedEvent = JSON.parse(eventData.value);
         
-        // Show dialog to get name and category
-        const name = prompt('Enter a name for this event:', 'my-event');
-        if (!name) return;
-        
-        const category = prompt('Enter a category (optional):', 'default');
-        
         // Save the event
-        const success = await eventsStore.saveEvent(name, parsedEvent, category || 'default');
+        const success = await eventsStore.saveEvent(
+          eventInfo.name, 
+          parsedEvent, 
+          eventInfo.category
+        );
         
         if (success) {
-          alert(`Event saved as "${name}" in category "${category || 'default'}"`);
+          notify.success(`Event saved as "${eventInfo.name}" in category "${eventInfo.category}"`);
+          showSaveEventModal.value = false;
         } else {
-          alert('Failed to save event');
+          notify.error('Failed to save event');
         }
       } catch (error) {
-        alert(`Invalid JSON event data: ${error.message}`);
+        notify.error(`Invalid JSON event data: ${error.message}`);
       }
     };
     
@@ -340,6 +360,7 @@ export default defineComponent({
       eventData,
       showSavedEvents,
       currentSessionId,
+      showSaveEventModal,
       
       // Computed
       currentHandler,
@@ -355,7 +376,7 @@ export default defineComponent({
       formatEvent,
       selectEvent,
       clearLogs,
-      saveEvent,
+      handleSaveEvent,
       getRelativePath
     };
   }

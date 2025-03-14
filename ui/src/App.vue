@@ -79,15 +79,23 @@
       <router-view v-if="!isInitializing || hasCompletedInitialLoad" />
     </main>
   </div>
+  
+  <!-- Global Notification Component -->
+  <Notification />
 </template>
 
 <script>
 import { defineComponent, onMounted, computed, ref, watch, onBeforeUnmount } from 'vue'
 import { useHandlersStore } from './stores/handlers'
 import { useExecutionStore } from './stores/execution'
+import Notification from './components/Notification.vue'
 
 export default defineComponent({
   name: 'App',
+  
+  components: {
+    Notification
+  },
   
   setup() {
     const handlersStore = useHandlersStore()

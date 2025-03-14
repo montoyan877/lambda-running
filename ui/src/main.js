@@ -4,6 +4,7 @@ import App from './App.vue'
 import router from './router'
 import './assets/css/main.css'
 import axios from 'axios'
+import Notification from './components/Notification.vue'
 
 // Comprobar si el servidor API está disponible
 async function checkApiServer() {
@@ -29,6 +30,9 @@ app.use(router)
 
 // Mount the application
 app.mount('#app')
+
+// Register global components
+app.component('Notification', Notification)
 
 // Check API server availability
 checkApiServer() 
