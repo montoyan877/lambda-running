@@ -1,5 +1,8 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
+import { useHandlerEventsStore } from './handlerEvents'
+import { useExecutionStore } from './execution'
+import { notify } from '../components/Notification.vue'
 
 export const useHandlersStore = defineStore('handlers', {
   state: () => ({
@@ -41,12 +44,16 @@ export const useHandlersStore = defineStore('handlers', {
             ? `${parentDir}/${fileName}`
             : fileName
           
+          // Create a unique ID for this handler
+          const handlerId = `${handler.path}:${method}`
+          
           grouped[parentDir].push({
             name: displayName,
             path: handler.path,
             relativePath: relativePath,
             method,
-            directory: parentDir
+            directory: parentDir,
+            id: handlerId
           })
         })
       })
@@ -81,7 +88,9 @@ export const useHandlersStore = defineStore('handlers', {
         path, 
         method,
         // Add relative path calculation
-        relativePath: this.getRelativePath(path)
+        relativePath: this.getRelativePath(path),
+        // Add unique ID for this handler
+        id: `${path}:${method}`
       }
     },
     
@@ -98,6 +107,85 @@ export const useHandlersStore = defineStore('handlers', {
       
       // If there are only 1 or 2 parts, just show the filename
       return parts[parts.length - 1];
+    },
+    
+    // Run a handler from the sidebar
+    runHandlerFromSidebar(handler) {
+      // This will be called after navigation has happened
+      // We need to determine what event data to use
+      
+      // 1. First check if there's an active event on the screen
+      // 2. If not, check if there's a favorite event for this handler
+      // 3. If not, use an empty event
+      
+      // We'll use a timeout to ensure the navigation has completed
+      setTimeout(() => {
+        const handlerEventsStore = useHandlerEventsStore()
+        const executionStore = useExecutionStore()
+        const handlerId = `${handler.path}:${handler.method}`
+        
+        // Set as active handler if not already active
+        if (!this.activeHandler || 
+            this.activeHandler.path !== handler.path || 
+            this.activeHandler.method !== handler.method) {
+          this.setActiveHandler(handler.path, handler.method)
+        }
+        
+        // Check if execution is already in progress
+        if (executionStore.isExecuting) {
+          notify.warning('Handler execution already in progress')
+          return
+        }
+        
+        // Get the event data to use
+        // This would be set by the component to the current event data on screen
+        let eventData = {}
+        
+        // Check if there's a favorite event for this handler
+        const favorite = handlerEventsStore.getFavorite(handlerId)
+        if (favorite) {
+          eventData = favorite.eventData
+          notify.info(`Using favorite event "${favorite.name}"`)
+        } else {
+          // Check if there's a last event for this handler
+          const lastEvent = handlerEventsStore.getLastEvent(handlerId)
+          if (lastEvent) {
+            eventData = lastEvent
+            notify.info('Using last executed event')
+          } else {
+            notify.info('Using empty event')
+          }
+        }
+        
+        // Run the handler
+        try {
+          const sessionId = executionStore.runHandler(
+            handler.path, 
+            handler.method, 
+            eventData
+          )
+          
+          if (sessionId) {
+            // Successfully started execution
+            notify.success(`Running handler: ${handler.relativePath} -> ${handler.method}`)
+          }
+        } catch (error) {
+          notify.error(`Failed to run handler: ${error.message}`)
+        }
+      }, 100) // Short delay to ensure navigation has completed
+    },
+    
+    // Stop the execution of a running handler
+    stopExecution() {
+      const executionStore = useExecutionStore()
+      
+      if (!executionStore.isExecuting) {
+        notify.warning('No handler execution in progress')
+        return
+      }
+      
+      executionStore.stopExecution()
+      notify.info('Handler execution stopped')
     }
   }
 }) 

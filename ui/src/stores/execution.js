@@ -7,7 +7,8 @@ export const useExecutionStore = defineStore('execution', {
     isExecuting: false,
     sessions: {},
     socket: null,
-    socketConnected: false
+    socketConnected: false,
+    currentSessionId: null
   }),
   
   actions: {
@@ -81,6 +82,18 @@ export const useExecutionStore = defineStore('execution', {
       this.socket.on('execution-end', () => {
         this.isExecuting = false;
       });
+      
+      this.socket.on('execution-stopped', () => {
+        this.isExecuting = false;
+        // Add a log entry to the current session
+        if (this.currentSessionId && this.sessions[this.currentSessionId]) {
+          this.sessions[this.currentSessionId].logs.push({
+            type: 'warn',
+            message: 'Execution stopped by user',
+            timestamp: Date.now()
+          });
+        }
+      });
     },
     
     disconnectSocket() {
@@ -98,6 +111,7 @@ export const useExecutionStore = defineStore('execution', {
       
       // Generate a unique session ID
       const sessionId = Date.now().toString();
+      this.currentSessionId = sessionId;
       
       // Initialize session
       this.sessions[sessionId] = {
@@ -142,6 +156,31 @@ export const useExecutionStore = defineStore('execution', {
       }
       
       return sessionId;
+    },
+    
+    stopExecution() {
+      if (!this.isExecuting) return;
+      
+      // Send stop command through socket if connected
+      if (this.socket && this.socketConnected && this.currentSessionId) {
+        this.socket.emit('stop-execution', {
+          sessionId: this.currentSessionId
+        });
+        
+        // We don't set isExecuting to false here, we wait for the execution-stopped event
+      } else {
+        // If no socket connection, just set status directly
+        this.isExecuting = false;
+        
+        // Add a log entry to the current session
+        if (this.currentSessionId && this.sessions[this.currentSessionId]) {
+          this.sessions[this.currentSessionId].logs.push({
+            type: 'warn',
+            message: 'Execution stopped by user (socket disconnected)',
+            timestamp: Date.now()
+          });
+        }
+      }
     },
     
     getSessionLogs(sessionId) {

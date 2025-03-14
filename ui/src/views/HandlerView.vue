@@ -3,7 +3,7 @@
     <!-- Header -->
     <header class="p-4 border-b border-dark-border bg-dark-100">
       <div class="flex items-center justify-between">
-        <div>
+        <div :class="{ 'pl-6': sidebarCollapsed }">
           <h1 class="text-xl font-bold">Handler Testing</h1>
           <p v-if="currentHandler" class="text-sm text-gray-400 mt-1">
             {{ currentHandler.relativePath || getRelativePath(currentHandler.path) }} -> {{ currentHandler.method }}
@@ -12,15 +12,24 @@
         
         <div class="flex space-x-3">
           <button 
+            v-if="!isExecuting"
             class="btn btn-primary text-sm flex items-center"
             @click="runHandler"
-            :disabled="isExecuting || !eventData"
+            :disabled="!eventData"
           >
-            <svg v-if="isExecuting" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <span>Run Handler</span>
+          </button>
+          
+          <button 
+            v-else
+            class="btn btn-danger text-sm flex items-center"
+            @click="stopExecution"
+          >
+            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <span>{{ isExecuting ? 'Running...' : 'Run Handler' }}</span>
+            <span>Stop Execution</span>
           </button>
           
           <button 
@@ -42,7 +51,7 @@
           <div class="p-3 border-b border-dark-border bg-dark-100 flex justify-between items-center">
             <h2 class="font-medium">Event Data</h2>
             
-            <div class="flex space-x-2">
+            <div class="flex space-x-2 items-center">
               <button 
                 v-if="showSavedEvents"
                 class="text-xs px-2 py-1 rounded bg-dark-hover hover:bg-dark-300 transition-colors"
@@ -189,11 +198,12 @@
 </template>
 
 <script>
-import { defineComponent, ref, computed, watch, onMounted } from 'vue';
+import { defineComponent, ref, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useHandlersStore } from '../stores/handlers';
 import { useEventsStore } from '../stores/events';
 import { useExecutionStore } from '../stores/execution';
+import { useHandlerEventsStore } from '../stores/handlerEvents';
 import CodeEditor from '../components/CodeEditor.vue';
 import Terminal from '../components/Terminal.vue';
 import ResizablePanel from '../components/ResizablePanel.vue';
@@ -218,6 +228,10 @@ export default defineComponent({
     const handlersStore = useHandlersStore();
     const eventsStore = useEventsStore();
     const executionStore = useExecutionStore();
+    const handlerEventsStore = useHandlerEventsStore();
+    
+    // Get sidebarCollapsed state from App component
+    const sidebarCollapsed = inject('sidebarCollapsed', ref(false));
     
     // UI State
     const eventEditor = ref(null);
@@ -227,10 +241,18 @@ export default defineComponent({
     const currentSessionId = ref(null);
     const showSaveEventModal = ref(false);
     
+    // Toggle dropdown menus
+    const toggleEventOptions = () => {
+      console.log('Esta funcionalidad ha sido temporalmente desactivada');
+    };
+    
     // On mount, initialize
     onMounted(() => {
       // Connect to socket
       executionStore.connectSocket();
+      
+      // Initialize handler events store
+      handlerEventsStore.initialize();
       
       // Fetch handlers if not loaded
       if (handlersStore.handlers.length === 0) {
@@ -246,8 +268,37 @@ export default defineComponent({
           decodeURIComponent(route.params.handlerPath),
           route.params.handlerMethod
         );
+        
+        // Check if there's a last event for this handler and load it
+        const handlerId = `${decodeURIComponent(route.params.handlerPath)}:${route.params.handlerMethod}`;
+        const lastEvent = handlerEventsStore.getLastEvent(handlerId);
+        if (lastEvent) {
+          eventData.value = JSON.stringify(lastEvent, null, 2);
+        }
       }
+      
+      // Add global event listener for Ctrl+Enter
+      window.addEventListener('keydown', handleKeydown);
     });
+    
+    // Remove event listener on unmount
+    onBeforeUnmount(() => {
+      window.removeEventListener('keydown', handleKeydown);
+    });
+    
+    // Handle keydown events
+    const handleKeydown = (event) => {
+      // Check if it's Ctrl+Enter
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        // Prevent default behavior (like form submission)
+        event.preventDefault();
+        
+        // Run handler if possible
+        if (currentHandler.value && !isExecuting.value && eventData.value) {
+          runHandler();
+        }
+      }
+    };
     
     // Watch for route changes
     watch(() => [route.params.handlerPath, route.params.handlerMethod], ([newPath, newMethod]) => {
@@ -256,6 +307,16 @@ export default defineComponent({
           decodeURIComponent(newPath),
           newMethod
         );
+        
+        // Check if there's a last event for this handler and load it
+        const handlerId = `${decodeURIComponent(newPath)}:${newMethod}`;
+        const lastEvent = handlerEventsStore.getLastEvent(handlerId);
+        if (lastEvent) {
+          eventData.value = JSON.stringify(lastEvent, null, 2);
+        } else {
+          // If no last event, reset to empty object
+          eventData.value = '{}';
+        }
       }
     });
     
@@ -276,6 +337,24 @@ export default defineComponent({
       return executionStore.getSessionResult(currentSessionId.value);
     });
     
+    // Watch for changes in current result to update execution history
+    watch(currentResult, (newResult) => {
+      if (newResult && currentHandler.value) {
+        try {
+          const parsedEvent = JSON.parse(eventData.value);
+          handlerEventsStore.addExecutionToHistory(
+            currentHandler.value.id,
+            parsedEvent,
+            newResult.result || newResult.error,
+            newResult.success,
+            newResult.duration
+          );
+        } catch (error) {
+          console.error('Failed to add execution to history:', error);
+        }
+      }
+    });
+    
     // Methods
     const runHandler = async () => {
       if (!currentHandler.value || isExecuting.value) return;
@@ -283,6 +362,11 @@ export default defineComponent({
       try {
         // Validate event data as JSON
         const parsedEvent = JSON.parse(eventData.value);
+        
+        // Save to handler event history
+        if (currentHandler.value) {
+          handlerEventsStore.saveLastEvent(currentHandler.value.id, parsedEvent);
+        }
         
         // Execute the handler
         currentSessionId.value = executionStore.runHandler(
@@ -293,6 +377,10 @@ export default defineComponent({
       } catch (error) {
         notify.error(`Invalid JSON event data: ${error.message}`);
       }
+    };
+    
+    const stopExecution = () => {
+      handlersStore.stopExecution();
     };
     
     const formatEvent = () => {
@@ -362,6 +450,9 @@ export default defineComponent({
       currentSessionId,
       showSaveEventModal,
       
+      // UI State
+      sidebarCollapsed,
+      
       // Computed
       currentHandler,
       isExecuting,
@@ -373,12 +464,26 @@ export default defineComponent({
       
       // Methods
       runHandler,
+      stopExecution,
       formatEvent,
       selectEvent,
       clearLogs,
       handleSaveEvent,
-      getRelativePath
+      getRelativePath,
+      toggleEventOptions
     };
   }
 });
-</script> 
+</script>
+
+<style scoped>
+.btn-danger {
+  @apply bg-red-500 hover:bg-red-600 text-white;
+}
+
+/* Fix dropdown z-index */
+.relative {
+  position: relative;
+  z-index: 20;
+}
+</style> 

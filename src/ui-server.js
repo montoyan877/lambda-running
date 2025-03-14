@@ -312,6 +312,9 @@ async function start(options = {}) {
   // Socket.io connection handling
   io.on('connection', (socket) => {
     console.log(chalk.green('Client connected to UI'));
+    
+    // Store the current execution context to allow cancellation
+    let currentExecutionContext = null;
 
     // Handler execution
     socket.on('run-handler', async (data) => {
@@ -320,11 +323,24 @@ async function start(options = {}) {
       // Capture console output
       const outputCapture = new OutputCapture(socket, sessionId);
       outputCapture.start();
+      
+      // Store the execution context
+      currentExecutionContext = {
+        sessionId,
+        outputCapture,
+        canceled: false
+      };
 
       try {
         socket.emit('execution-start', { sessionId });
 
         const startTime = Date.now();
+        
+        // Allow the execution to be canceled
+        if (currentExecutionContext.canceled) {
+          throw new Error('Execution canceled by user');
+        }
+        
         const result = await runHandler(
           handlerPath,
           handlerMethod,
@@ -335,6 +351,11 @@ async function start(options = {}) {
           }
         );
         const duration = Date.now() - startTime;
+        
+        // Check if execution was canceled during the run
+        if (currentExecutionContext.canceled) {
+          throw new Error('Execution canceled by user');
+        }
 
         socket.emit('execution-result', {
           success: true,
@@ -343,17 +364,47 @@ async function start(options = {}) {
           sessionId,
         });
       } catch (error) {
-        socket.emit('execution-result', {
-          success: false,
-          error: {
-            message: error.message,
-            stack: error.stack,
-          },
-          sessionId,
-        });
+        // Check if this was a cancellation
+        if (currentExecutionContext && currentExecutionContext.canceled) {
+          socket.emit('execution-stopped', { sessionId });
+        } else {
+          socket.emit('execution-result', {
+            success: false,
+            error: {
+              message: error.message,
+              stack: error.stack,
+            },
+            sessionId,
+          });
+        }
       } finally {
         outputCapture.stop();
         socket.emit('execution-end', { sessionId });
+        currentExecutionContext = null;
+      }
+    });
+    
+    // Handle stop execution request
+    socket.on('stop-execution', (data) => {
+      const { sessionId } = data;
+      
+      // Only cancel if there's a running execution with matching sessionId
+      if (currentExecutionContext && currentExecutionContext.sessionId === sessionId) {
+        console.log(chalk.yellow(`Execution stopped by user for session ${sessionId}`));
+        
+        // Mark as canceled
+        currentExecutionContext.canceled = true;
+        
+        // Send an immediate console message
+        socket.emit('console', {
+          type: 'warn',
+          message: 'Execution canceled by user',
+          timestamp: Date.now(),
+          sessionId
+        });
+        
+        // Send the stopped event
+        socket.emit('execution-stopped', { sessionId });
       }
     });
 
