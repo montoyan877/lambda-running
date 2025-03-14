@@ -1,10 +1,14 @@
-# Directorios de dependencias
-node_modules
-coverage
+# Directories
+ui/
+node_modules/
+dist/
+coverage/
+lib/
+
+# Files
+.eslintrc.js
 
 # Directorios de construcción
-dist
-lib
 build
 
 # Archivos generados

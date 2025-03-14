@@ -1,9 +1,6 @@
 /**
  * Tests for lambda-runner.js
  */
-const path = require('path');
-const fs = require('fs');
-const { runHandler, scanForHandlers } = require('../../src/lambda-runner');
 
 // Mock fs and path for testing
 jest.mock('fs');
@@ -198,7 +195,6 @@ describe('Lambda Runner', () => {
     const mockEvent = { test: 'event' };
     const expectedResult = { success: true };
     let mockHandler;
-    let originalRequire;
     let fs;
     let path;
 
@@ -229,7 +225,6 @@ describe('Lambda Runner', () => {
       mockHandler = jest.fn().mockResolvedValue(expectedResult);
 
       // Setup mock for require
-      originalRequire = jest.requireActual;
       const mockRequireResult = { [handlerMethod]: mockHandler };
 
       // Mock the require function

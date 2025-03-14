@@ -154,24 +154,6 @@ describe('Event Store', () => {
 
   describe('getEvents', () => {
     test('should return events when available', () => {
-      // Create mock event data to return
-      const mockEvents = [
-        {
-          name: 'test-event',
-          category: 'default',
-          timestamp: new Date().toISOString(),
-          data: { test: 'data' },
-          path: '/project/dir/.lambdaRunning/events/default/test-event.json',
-        },
-        {
-          name: 'another-event',
-          category: 'default',
-          timestamp: new Date().toISOString(),
-          data: { more: 'test data' },
-          path: '/project/dir/.lambdaRunning/events/default/another-event.json',
-        },
-      ];
-
       // Point getEventStoreDir to the project dir
       fs.writeFileSync.mockImplementationOnce(() => {});
       fs.unlinkSync.mockImplementationOnce(() => {});
@@ -208,15 +190,6 @@ describe('Event Store', () => {
     });
 
     test('should filter events by category when specified', () => {
-      // Create mock event for custom category
-      const mockEvent = {
-        name: 'custom-event',
-        category: 'custom-category',
-        timestamp: new Date().toISOString(),
-        data: { custom: 'data' },
-        path: '/project/dir/.lambdaRunning/events/custom-category/custom-event.json',
-      };
-
       // Setup mocks for this test
       fs.writeFileSync.mockImplementationOnce(() => {});
       fs.unlinkSync.mockImplementationOnce(() => {});
@@ -254,14 +227,6 @@ describe('Event Store', () => {
 
   describe('getEvent', () => {
     test('should return a specific event by name and category', () => {
-      // Mock finding the specific event
-      const mockEventObj = {
-        name: 'test-event',
-        category: 'default',
-        timestamp: new Date().toISOString(),
-        data: { test: 'data' },
-      };
-
       // Setup mocks for this test
       fs.writeFileSync.mockImplementationOnce(() => {});
       fs.unlinkSync.mockImplementationOnce(() => {});

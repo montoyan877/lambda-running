@@ -10,63 +10,70 @@ const fs = require('fs');
 let tsNodeAvailable = false;
 let tsconfigPathsAvailable = false;
 
-try {
-  require.resolve('ts-node');
-  tsNodeAvailable = true;
+// Skip TS check if environment variable is set (for development mode)
+const skipTsCheck = process.env.SKIP_TS_CHECK === 'true';
 
-  // Check if tsconfig-paths is installed for alias support
+if (!skipTsCheck) {
   try {
-    require.resolve('tsconfig-paths');
-    tsconfigPathsAvailable = true;
-  } catch (err) {
-    console.warn('Path aliases not supported. Install tsconfig-paths if needed.');
-    tsconfigPathsAvailable = false;
-  }
+    require.resolve('ts-node');
+    tsNodeAvailable = true;
 
-  // Look for project's tsconfig.json
-  const projectTsConfigPath = path.join(process.cwd(), 'tsconfig.json');
-  let tsNodeOptions = {
-    transpileOnly: true,
-    compilerOptions: {
-      module: 'commonjs',
-      target: 'es2017',
-    },
-  };
-
-  // If project has a tsconfig.json, use it instead of default options
-  if (fs.existsSync(projectTsConfigPath)) {
-    const chalk = require('chalk');
-    console.log(chalk.green(`Using TypeScript configuration from ${projectTsConfigPath}`));
-    // ts-node will automatically pick up the tsconfig.json from the project root
-    // We still set transpileOnly for better performance
-    tsNodeOptions = { transpileOnly: true };
-
-    // Register tsconfig-paths if available to support path aliases
-    if (tsconfigPathsAvailable) {
-      // Load the tsconfig manually to check for path aliases
-      let tsconfig;
-      try {
-        tsconfig = JSON.parse(fs.readFileSync(projectTsConfigPath, 'utf8'));
-        if (tsconfig.compilerOptions && tsconfig.compilerOptions.paths) {
-          // Register tsconfig-paths
-          require('tsconfig-paths').register({
-            baseUrl: tsconfig.compilerOptions.baseUrl || '.',
-            paths: tsconfig.compilerOptions.paths,
-          });
-        }
-      } catch (e) {
-        console.warn(`Error parsing tsconfig.json: ${e.message}`);
-      }
+    // Check if tsconfig-paths is installed for alias support
+    try {
+      require.resolve('tsconfig-paths');
+      tsconfigPathsAvailable = true;
+    } catch (err) {
+      console.warn('Path aliases not supported. Install tsconfig-paths if needed.');
+      tsconfigPathsAvailable = false;
     }
-  } else {
-    console.log('No tsconfig.json found, using default TypeScript configuration');
-  }
 
-  // Register ts-node to import .ts files
-  require('ts-node').register(tsNodeOptions);
-} catch (err) {
-  // ts-node is not installed, continue without it
-  console.warn(`ts-node not found: ${err.message}`);
+    // Look for project's tsconfig.json
+    const projectTsConfigPath = path.join(process.cwd(), 'tsconfig.json');
+    let tsNodeOptions = {
+      transpileOnly: true,
+      compilerOptions: {
+        module: 'commonjs',
+        target: 'es2017',
+      },
+    };
+
+    // If project has a tsconfig.json, use it instead of default options
+    if (fs.existsSync(projectTsConfigPath)) {
+      const chalk = require('chalk');
+      console.log(chalk.green(`Using TypeScript configuration from ${projectTsConfigPath}`));
+      // ts-node will automatically pick up the tsconfig.json from the project root
+      // We still set transpileOnly for better performance
+      tsNodeOptions = { transpileOnly: true };
+
+      // Register tsconfig-paths if available to support path aliases
+      if (tsconfigPathsAvailable) {
+        // Load the tsconfig manually to check for path aliases
+        let tsconfig;
+        try {
+          tsconfig = JSON.parse(fs.readFileSync(projectTsConfigPath, 'utf8'));
+          if (tsconfig.compilerOptions && tsconfig.compilerOptions.paths) {
+            // Register tsconfig-paths
+            require('tsconfig-paths').register({
+              baseUrl: tsconfig.compilerOptions.baseUrl || '.',
+              paths: tsconfig.compilerOptions.paths,
+            });
+          }
+        } catch (e) {
+          console.warn(`Error parsing tsconfig.json: ${e.message}`);
+        }
+      }
+    } else {
+      console.log('No tsconfig.json found, using default TypeScript configuration');
+    }
+
+    // Register ts-node to import .ts files
+    require('ts-node').register(tsNodeOptions);
+  } catch (err) {
+    // ts-node is not installed, continue without it
+    console.warn(`ts-node not found: ${err.message}`);
+  }
+} else {
+  console.log('Skipping TypeScript setup as SKIP_TS_CHECK is true');
 }
 
 /**
@@ -131,7 +138,9 @@ function loadEnvFile(directory) {
     const envFilePath = path.join(directory, '.env');
 
     if (fs.existsSync(envFilePath)) {
-      console.log(`Loading environment variables from ${envFilePath}`);
+      global.systemLog ? global.systemLog(`Loading environment variables from ${envFilePath}`) : 
+        console.log(`Loading environment variables from ${envFilePath}`);
+      
       const content = fs.readFileSync(envFilePath, 'utf8');
       const lines = content
         .split('\n')
@@ -158,10 +167,24 @@ function loadEnvFile(directory) {
       }
     }
   } catch (error) {
-    console.warn('Could not read .env file:', error.message);
+    global.systemLog ? global.systemLog(`Could not read .env file: ${error.message}`) : 
+      console.warn('Could not read .env file:', error.message);
   }
 
   return envVars;
+}
+
+// Añadir función global para facilitar el logueo explícito para Lambda Running
+function setupGlobalLogging() {
+  // Función global para imprimir logs explícitos de Lambda
+  global.lambdaLog = (...args) => {
+    console.log(`[LAMBDA] ${args.join(' ')}`);
+  };
+  
+  // Función global para imprimir logs de sistema (que serán filtrados y no aparecerán en el Output)
+  global.systemLog = (...args) => {
+    console.info(`[SYSTEM] ${args.join(' ')}`);
+  };
 }
 
 /**
@@ -176,11 +199,17 @@ function loadEnvFile(directory) {
  */
 async function runHandler(handlerPath, handlerMethod, event, context = {}, options = {}) {
   try {
+    // Configurar funciones globales de logging
+    setupGlobalLogging();
+    
     // Set default options
     const opts = {
       loadEnv: true,
       ...options,
     };
+
+    // Log de sistema usando systemLog - no será visible en el Output
+    global.systemLog(`Starting execution of handler: ${handlerPath} -> ${handlerMethod}`);
 
     // Resolve the absolute path if it's relative
     const absolutePath = path.isAbsolute(handlerPath)
@@ -218,11 +247,7 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
       const dirTsConfigPath = path.join(handlerDir, 'tsconfig.json');
       if (fs.existsSync(dirTsConfigPath) && path.dirname(absolutePath) !== process.cwd()) {
         const chalk = require('chalk');
-        console.log(
-          chalk.green(`Using TypeScript configuration from handler directory: ${dirTsConfigPath}`)
-        );
-        // We don't re-register ts-node here as it's already registered globally,
-        // but we log to inform the user that the handler directory's config will apply
+        global.systemLog(`Using TypeScript configuration from handler directory: ${dirTsConfigPath}`);
       }
     }
 
@@ -252,9 +277,64 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
     };
 
     // Execute the handler
-    return await handler[handlerMethod](event, defaultContext);
+    global.systemLog('Executing handler...');
+    const startTime = Date.now();
+    
+    // Ejecutar el handler dentro de un try-catch para capturar errores
+    let result;
+    try {
+      result = await handler[handlerMethod](event, defaultContext);
+    } catch (handlerError) {
+      // Para las excepciones que ocurren durante la ejecución del handler,
+      // necesitamos asegurarnos de capturar el nombre exacto de la excepción
+      
+      if (handlerError instanceof Error) {
+        // Capturar el nombre exacto de la clase de error
+        // Hacemos el log de una manera especial para que se preserve el nombre de la clase
+        console.log(`${handlerError.constructor.name || handlerError.name || 'Error'} [Error]`);
+        
+        // Logueamos el stack trace si existe, o el mensaje de error si no hay stack
+        if (handlerError.stack) {
+          console.log(handlerError.stack.split('\n').slice(1).join('\n'));
+        } else if (handlerError.message) {
+          console.log(handlerError.message);
+        }
+        
+        // Detalles adicionales solo en logs del sistema
+        global.systemLog(`Error interceptado: ${handlerError.constructor.name || handlerError.name}: ${handlerError.message}`);
+        
+        // Si el error tiene propiedades adicionales, mostrarlas solo en los logs del sistema
+        const errorProps = {};
+        for (const key in handlerError) {
+          if (key !== 'name' && key !== 'message' && key !== 'stack' && typeof handlerError[key] !== 'function') {
+            errorProps[key] = handlerError[key];
+          }
+        }
+        
+        if (Object.keys(errorProps).length > 0) {
+          global.systemLog('Error additional details:', errorProps);
+        }
+      } else {
+        // Si no es un Error, loguearlo tal cual
+        console.log(handlerError);
+      }
+      
+      // Re-lanzar el error para que se maneje adecuadamente
+      throw handlerError;
+    }
+    
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    
+    global.systemLog(`Handler returned result: ${JSON.stringify(result, null, 2)}`);
+    global.systemLog(`Execution completed in ${duration}ms`);
+    return result;
   } catch (error) {
-    console.error('Error running Lambda handler:', error);
+    // También usar systemLog para los mensajes de error para que no se muestren en el Output
+    global.systemLog(`Error: ${error.message}`);
+    global.systemLog(`Error details: ${error.stack}`);
+    
+    // Asegurarnos de que el error se propague para ser manejado por quien llamó a esta función
     throw error;
   }
 }
@@ -320,7 +400,9 @@ function scanDirectory(directory, extensions, ignorePatterns) {
             // Check if it's a TypeScript file and ts-node is not available
             const isTypeScript = ext === '.ts';
             if (isTypeScript && !tsNodeAvailable) {
-              console.warn(`Skipping TypeScript file (ts-node not available): ${filePath}`);
+              global.systemLog ? 
+                global.systemLog(`Skipping TypeScript file (ts-node not available): ${filePath}`) : 
+                console.warn(`Skipping TypeScript file (ts-node not available): ${filePath}`);
               continue;
             }
 
@@ -340,13 +422,17 @@ function scanDirectory(directory, extensions, ignorePatterns) {
             }
           } catch (error) {
             // Skip files that can't be required
-            console.warn(`Could not load potential handler: ${filePath}`, error.message);
+            global.systemLog ? 
+              global.systemLog(`Could not load potential handler: ${filePath} - ${error.message}`) : 
+              console.warn(`Could not load potential handler: ${filePath}`, error.message);
           }
         }
       }
     }
   } catch (error) {
-    console.error(`Error scanning directory ${directory}:`, error);
+    global.systemLog ? 
+      global.systemLog(`Error scanning directory ${directory}: ${error.message}`) : 
+      console.error(`Error scanning directory ${directory}:`, error);
   }
 
   return results;
