@@ -680,6 +680,9 @@ async function start(options = {}) {
         // Mark that we are inside the handler code
         outputCapture.inHandlerCode = true;
 
+        // Define startTime to measure execution duration
+        const startTime = Date.now();
+
         let result;
         try {
           result = await runHandler(
