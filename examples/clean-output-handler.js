@@ -1,34 +1,33 @@
 /**
  * Example Lambda handler that demonstrates clean output
- * Shows how logs de la función lambda aparecen en el Output
- * mientras que logs de sistema no aparecen
+ * Shows how logs from the lambda function appear in the Output
+ * while system logs do not appear
  */
 
 // Handler function that returns environment information
 exports.handler = async (event) => {
-  // Los console.log estándar ahora aparecerán solo en el Output
-  console.log('Este log solo se muestra en Output');
-  console.warn('Este warning también aparece en Output');
+  // Standard console.log will now appear only in Output
+  console.log('This log is only shown in Output');
+  console.warn('This warning also appears in Output');
   
-  // Usar lambdaLog para garantizar que algo aparezca en Output
+  // Use lambdaLog to ensure something appears in Output
   if (global.lambdaLog) {
-    global.lambdaLog('Este mensaje usa lambdaLog() y siempre se muestra en Output');
+    global.lambdaLog('This message uses lambdaLog() and is always shown in Output');
   }
   
-  // Este log de sistema no se mostrará en Output
   if (global.systemLog) {
-    global.systemLog('Este mensaje usa systemLog() y nunca se muestra en Output');
+    global.systemLog('This message uses systemLog() and is never shown in Output');
   }
   
-  // Simulando procesamiento
+  // Simulating processing
   await new Promise(resolve => setTimeout(resolve, 500));
   
-  // Retornar algo significativo
+  // Return something meaningful
   return {
     statusCode: 200,
     body: JSON.stringify(
       {
-        message: 'Función ejecutada con output limpio',
+        message: 'Function executed with clean output',
         eventReceived: event,
         timestamp: new Date().toISOString(),
       },
