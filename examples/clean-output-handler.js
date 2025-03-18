@@ -5,7 +5,7 @@
  */
 
 // Handler function that returns environment information
-exports.handler = async (event, context) => {
+exports.handler = async (event) => {
   // Los console.log estándar ahora aparecerán solo en el Output
   console.log('Este log solo se muestra en Output');
   console.warn('Este warning también aparece en Output');

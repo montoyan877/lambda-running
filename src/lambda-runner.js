@@ -157,7 +157,7 @@ function loadEnvFile(directory) {
           // Remove quotes if present
           if (
             (value.startsWith('"') && value.endsWith('"')) ||
-            (value.startsWith("'") && value.endsWith("'"))
+            (value.startsWith('\'') && value.endsWith('\''))
           ) {
             value = value.substring(1, value.length - 1);
           }
@@ -246,7 +246,6 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
       // Check for a tsconfig.json specific to the handler's directory
       const dirTsConfigPath = path.join(handlerDir, 'tsconfig.json');
       if (fs.existsSync(dirTsConfigPath) && path.dirname(absolutePath) !== process.cwd()) {
-        const chalk = require('chalk');
         global.systemLog(`Using TypeScript configuration from handler directory: ${dirTsConfigPath}`);
       }
     }

@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "serve": "vite preview"
+    "serve": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@vueuse/core": "^13.0.0",
@@ -21,12 +24,16 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.14",
+    "@testing-library/vue": "^7.0.0",
     "@vitejs/plugin-vue": "^4.3.4",
+    "@vue/test-utils": "^2.4.1",
     "autoprefixer": "^10.4.15",
     "eslint": "^9.22.0",
     "eslint-plugin-vue": "^10.0.0",
+    "jsdom": "^22.1.0",
     "postcss": "^8.4.29",
     "tailwindcss": "^3.3.3",
-    "vite": "^4.4.9"
+    "vite": "^4.4.9",
+    "vitest": "^3.0.9"
   }
 }

@@ -413,90 +413,6 @@ async function start(options = {}) {
         <h1>Lambda Running UI</h1>
         <p>The full UI is coming soon. We're working on an elegant, powerful interface for testing your Lambda functions.</p>
         <p class="loading">Loading resources...</p>
-        
-        <script>
-          // Simple script to connect to WebSocket for basic demo
-          const socket = new WebSocket('ws://' + window.location.host + '/socket.io/?EIO=4&transport=websocket');
-          
-          // Contenedor principal para los mensajes
-          let outputContainer;
-          
-          socket.onopen = () => {
-            console.log('Connected to server');
-            const loadingElement = document.querySelector('.loading');
-            loadingElement.textContent = 'Connected to server! Full UI coming soon.';
-            
-            // Crear un contenedor específico para la salida
-            outputContainer = document.createElement('div');
-            outputContainer.className = 'output-container';
-            outputContainer.style.cssText = 'width: 100%; max-width: 900px; text-align: left; margin-top: 20px; padding: 10px; background-color: #2d2d2d; border-radius: 4px; overflow: auto; max-height: 70vh;';
-            loadingElement.parentNode.insertBefore(outputContainer, loadingElement.nextSibling);
-            
-            // Escuchar eventos de consola
-            socket.addEventListener('message', (event) => {
-              try {
-                const data = JSON.parse(event.data);
-                
-                // Procesar eventos de consola
-                if (data.type === 'console') {
-                  const consoleData = data.data;
-                  
-                  // Eliminar cualquier timestamp que pueda tener el mensaje
-                  let message = consoleData.message;
-                  message = message.replace(/\[\d{2}:\d{2}:\d{2}\]\s*/g, '');    // [HH:MM:SS]
-                  message = message.replace(/\d{2}:\d{2}:\d{2}\s*/g, '');        // HH:MM:SS sin corchetes
-                  message = message.replace(/^\s*Error\s*$/i, '');               // Solo la palabra "Error" sola
-                  
-                  // Si después de limpiar el mensaje queda vacío, ignorarlo
-                  if (!message.trim()) return;
-                  
-                  // Crear elemento de mensaje
-                  const messageEl = document.createElement('div');
-                  
-                  // Aplicar la clase CSS específica si viene del servidor
-                  if (consoleData.errorClass) {
-                    messageEl.className = consoleData.errorClass;
-                  } 
-                  // O determinar el tipo de mensaje basado en su contenido
-                  else if (consoleData.type === 'error') {
-                    // Por defecto, todo mensaje de error tiene la clase base
-                    messageEl.className = 'error-message';
-                    
-                    // Detectar tipos específicos de errores
-                    if (message.includes('[Error]') || 
-                        /^[A-Z][a-zA-Z]+Exception/.test(message)) {
-                      // Es una línea con el nombre de la excepción
-                      messageEl.className = 'error-message-heading';
-                    } 
-                    else if (message.trim().startsWith('at ') || 
-                            /^\s+at\s/.test(message) ||
-                            (message.includes('.ts:') && message.includes(':')) ||
-                            (message.includes('.js:') && message.includes(':'))) {
-                      // Es una línea de stack trace
-                      messageEl.className = 'stack-trace';
-                    }
-                  }
-                  
-                  // Establecer el texto del mensaje
-                  messageEl.textContent = message;
-                  
-                  // Añadir al contenedor
-                  outputContainer.appendChild(messageEl);
-                  
-                  // Auto-scroll hasta el último mensaje
-                  outputContainer.scrollTop = outputContainer.scrollHeight;
-                }
-              } catch (e) {
-                console.error('Error parsing message:', e);
-              }
-            });
-          };
-          
-          socket.onclose = () => {
-            console.log('Disconnected from server');
-            document.querySelector('.loading').textContent = 'Disconnected from server.';
-          };
-        </script>
       </body>
       </html>
     `);
@@ -880,5 +796,9 @@ async function stop() {
 module.exports = {
   start,
   stop,
+  // Exponer OutputCapture para pruebas
+  __test_only_for_coverage__: {
+    OutputCapture
+  }
 };
 

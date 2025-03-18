@@ -15,11 +15,11 @@ export const useExecutionStore = defineStore('execution', {
     connectSocket() {
       if (this.socket) {
         // Already connected or connecting
-        return
+        return;
       }
       
-      // Conectar a socket.io en la misma URL base que el frontend
-      // pero asegurándose de que usamos la configuración correcta para Socket.IO
+      // Connect to socket.io on the same base URL as the frontend
+      // but making sure we use the correct configuration for Socket.IO
       this.socket = io('http://localhost:3000', {
         transports: ['websocket', 'polling'],
         reconnection: true,
@@ -27,6 +27,9 @@ export const useExecutionStore = defineStore('execution', {
         reconnectionDelay: 1000
       });
       
+      if (!this.socket) return;
+      
+      // Add event listeners to socket
       this.socket.on('connect', () => {
         console.log('Socket connected');
         this.socketConnected = true;
@@ -37,7 +40,7 @@ export const useExecutionStore = defineStore('execution', {
         this.socketConnected = false;
       });
       
-      // Escuchar eventos de consola y resultados
+      // Listen for console events and results
       this.socket.on('console', (data) => {
         const { sessionId, type, message, timestamp } = data;
         
@@ -124,7 +127,7 @@ export const useExecutionStore = defineStore('execution', {
         result: null
       };
       
-      // Enviar comando para ejecutar el handler a través del socket
+      // Send command to execute the handler through the socket
       if (this.socket && this.socketConnected) {
         this.socket.emit('run-handler', {
           handlerPath,
@@ -133,7 +136,7 @@ export const useExecutionStore = defineStore('execution', {
           sessionId
         });
       } else {
-        // Si no hay conexión socket, intentar con REST API
+        // If there's no socket connection, try with REST API
         axios.post('/api/run', {
           path: handlerPath,
           method: handlerMethod,
@@ -227,7 +230,7 @@ export const useExecutionStore = defineStore('execution', {
         duration: duration
       };
       
-      // También indicamos que la ejecución ha terminado
+      // Also indicate that execution has finished
       this.isExecuting = false;
     }
   }
