@@ -6,13 +6,9 @@
  */
 
 const path = require('path');
-const fs = require('fs');
 
 // Resolve the module's root path
 const moduleRoot = path.resolve(__dirname, '..');
-
-// Path to the compiled UI dist folder
-const uiDistPath = path.join(moduleRoot, 'lib', 'ui-dist');
 
 // Load the UI server module
 let uiServer;
