@@ -12,6 +12,7 @@ const chalk = require('chalk');
 const { scanForHandlers, runHandler } = require('./lambda-runner');
 const { saveEvent, getEvents, getEvent, deleteEvent } = require('./event-store');
 const path = require('path');
+const fs = require('fs');
 
 // Create an Express application
 const app = express();
@@ -325,98 +326,126 @@ async function start(options = {}) {
   app.use(cors());
   app.use(express.json());
 
-  // Static file serving will be added here once we build the frontend
-  // For now, we'll just serve a placeholder page
-  app.get('/', (req, res) => {
-    res.send(`
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Lambda Running UI</title>
-        <style>
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: #1e1e1e;
-            color: #e1e1e1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            padding: 20px;
-            text-align: center;
-          }
-          h1 {
-            color: #7e57c2;
-            margin-bottom: 1rem;
-          }
-          p {
-            max-width: 600px;
-            line-height: 1.6;
-          }
-          .loading {
-            margin-top: 2rem;
-            font-style: italic;
-            color: #888;
-          }
-          /* Estilos para mensajes de error */
-          .error-message {
-            color: #ff5252;
-            font-weight: bold;
-            white-space: pre-wrap;
-            font-family: monospace;
-            text-align: left;
-            padding: 10px;
-            background-color: rgba(255, 0, 0, 0.05);
-            border-left: 4px solid #ff5252;
-            margin: 8px 0;
-            overflow-x: auto;
-            display: block;
-            width: calc(100% - 20px);
-          }
-          
-          /* Enfatizar la línea con el nombre de la excepción */
-          .error-message-heading {
-            color: #ff3333;
-            font-size: 1.2em;
-            font-weight: bold;
-            font-family: monospace;
-            background-color: rgba(255, 0, 0, 0.1);
-            padding: 12px 10px;
-            margin: 15px 0 0 0;
-            border-left: 4px solid #ff3333;
-            border-top-left-radius: 3px;
-            border-top-right-radius: 3px;
-            text-align: left;
-            display: block;
-          }
-          
-          /* Stack trace con formato adecuado */
-          .stack-trace {
-            white-space: pre;
-            font-family: monospace;
-            color: #ff7777;
-            margin: 0;
-            padding: 5px 10px 5px 20px;
-            font-size: 0.9em;
-            background-color: rgba(255, 0, 0, 0.03);
-            border-left: 4px solid rgba(255, 82, 82, 0.5);
-            text-align: left;
-            display: block;
-          }
-        </style>
-      </head>
-      <body>
-        <h1>Lambda Running UI</h1>
-        <p>The full UI is coming soon. We're working on an elegant, powerful interface for testing your Lambda functions.</p>
-        <p class="loading">Loading resources...</p>
-      </body>
-      </html>
-    `);
-  });
+  // First try to find UI in lib/ui-dist (optimized build)
+  let uiDistPath = path.join(__dirname, '..', 'lib', 'ui-dist');
+  
+  // Fallback to src/ui-dist if lib version doesn't exist
+  if (!fs.existsSync(uiDistPath) || !fs.existsSync(path.join(uiDistPath, 'index.html'))) {
+    uiDistPath = path.join(__dirname, 'ui-dist');
+  }
+  
+  if (fs.existsSync(uiDistPath) && fs.existsSync(path.join(uiDistPath, 'index.html'))) {
+    global.systemLog(`Serving UI from bundled files at ${uiDistPath}`);
+    
+    // Serve static files with proper cache control
+    app.use(express.static(uiDistPath, {
+      etag: true,
+      lastModified: true,
+      maxAge: '1d', // Cache for 1 day
+      immutable: true
+    }));
+    
+    // Serve index.html for all non-API routes (SPA routing)
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api/')) {
+        return next();
+      }
+      res.sendFile(path.join(uiDistPath, 'index.html'));
+    });
+  } else {
+    global.systemLog('UI dist folder not found, serving fallback page');
+    // Serve placeholder page if ui-dist doesn't exist
+    app.get('/', (req, res) => {
+      res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Lambda Running UI</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              background-color: #1e1e1e;
+              color: #e1e1e1;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              height: 100vh;
+              margin: 0;
+              padding: 20px;
+              text-align: center;
+            }
+            h1 {
+              color: #7e57c2;
+              margin-bottom: 1rem;
+            }
+            p {
+              max-width: 600px;
+              line-height: 1.6;
+            }
+            .loading {
+              margin-top: 2rem;
+              font-style: italic;
+              color: #888;
+            }
+            /* Estilos para mensajes de error */
+            .error-message {
+              color: #ff5252;
+              font-weight: bold;
+              white-space: pre-wrap;
+              font-family: monospace;
+              text-align: left;
+              padding: 10px;
+              background-color: rgba(255, 0, 0, 0.05);
+              border-left: 4px solid #ff5252;
+              margin: 8px 0;
+              overflow-x: auto;
+              display: block;
+              width: calc(100% - 20px);
+            }
+            
+            /* Enfatizar la línea con el nombre de la excepción */
+            .error-message-heading {
+              color: #ff3333;
+              font-size: 1.2em;
+              font-weight: bold;
+              font-family: monospace;
+              background-color: rgba(255, 0, 0, 0.1);
+              padding: 12px 10px;
+              margin: 15px 0 0 0;
+              border-left: 4px solid #ff3333;
+              border-top-left-radius: 3px;
+              border-top-right-radius: 3px;
+              text-align: left;
+              display: block;
+            }
+            
+            /* Stack trace con formato adecuado */
+            .stack-trace {
+              white-space: pre;
+              font-family: monospace;
+              color: #ff7777;
+              margin: 0;
+              padding: 5px 10px 5px 20px;
+              font-size: 0.9em;
+              background-color: rgba(255, 0, 0, 0.03);
+              border-left: 4px solid rgba(255, 82, 82, 0.5);
+              text-align: left;
+              display: block;
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Lambda Running UI</h1>
+          <p>The full UI is coming soon. We're working on an elegant, powerful interface for testing your Lambda functions.</p>
+          <p class="loading">Loading resources...</p>
+        </body>
+        </html>
+      `);
+    });
+  }
 
   // API endpoints
 

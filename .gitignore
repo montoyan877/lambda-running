@@ -24,3 +24,8 @@ coverage
 # OS generated files
 .DS_Store
 Thumbs.db
+
+dist
+src/ui-dist
+ui/dist
+lib
