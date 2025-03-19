@@ -21,7 +21,6 @@ let io;
 
 // Store running state
 let isRunning = false;
-let port = 3000;
 
 // Configure global logging functions
 function setupGlobalLogging() {
@@ -337,150 +336,16 @@ async function start(options = {}) {
   app.use(cors());
   app.use(express.json());
 
-  // Serve UI from lib/ui-dist
-  let uiDistPath;
+  // Configure API endpoints first - these need to be available in all modes
   
-  if (developmentMode) {
-    // In development mode, we expect to find the UI source in the 'ui' directory
-    uiDistPath = path.join(projectDir, 'ui');
-    global.systemLog(`Looking for UI source in ${uiDistPath}`);
-  } else {
-    // In production mode, look for compiled files in lib/ui-dist relative to the module root
-    uiDistPath = path.join(moduleRoot, 'lib', 'ui-dist');
-    global.systemLog(`Serving UI from bundled files at ${uiDistPath}`);
-  }
-
-  if (!developmentMode && fs.existsSync(uiDistPath) && fs.existsSync(path.join(uiDistPath, 'index.html'))) {
-    global.systemLog(`UI static files found at ${uiDistPath}`);
-    
-    // Serve static files with proper cache control
-    app.use(express.static(uiDistPath, {
-      etag: true,
-      lastModified: true,
-      setHeaders: (res) => {
-        res.setHeader('Cache-Control', 'public, max-age=86400');
-      }
-    }));
-    
-    // Handle root path explicitly - redirect to handlers view
-    app.get('/', (req, res) => {
-      res.redirect('/handlers');
+  // Simple healthcheck endpoint
+  app.get('/api/healthcheck', (req, res) => {
+    res.json({ 
+      status: 'ok', 
+      mode: developmentMode ? 'development' : 'production',
+      timestamp: new Date().toISOString()
     });
-    
-    // Handle all assets with explicit paths
-    app.get('/assets/*', (req, res) => {
-      const assetPath = path.join(uiDistPath, req.path);
-      if (fs.existsSync(assetPath)) {
-        res.sendFile(assetPath);
-      } else {
-        global.systemLog(`Asset not found: ${assetPath}`);
-        res.status(404).send('Asset not found');
-      }
-    });
-    
-    // Serve index.html for all non-API routes (SPA routing)
-    app.get('*', (req, res, next) => {
-      if (req.path.startsWith('/api/')) {
-        return next();
-      }
-      res.sendFile(path.join(uiDistPath, 'index.html'));
-    });
-  } else if (developmentMode) {
-    global.systemLog('UI dist folder not found, serving fallback page');
-    // Serve placeholder page if ui-dist doesn't exist
-    app.get('/', (req, res) => {
-      res.send(`
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Lambda Running UI</title>
-          <style>
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              background-color: #1e1e1e;
-              color: #e1e1e1;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              height: 100vh;
-              margin: 0;
-              padding: 20px;
-              text-align: center;
-            }
-            h1 {
-              color: #7e57c2;
-              margin-bottom: 1rem;
-            }
-            p {
-              max-width: 600px;
-              line-height: 1.6;
-            }
-            .loading {
-              margin-top: 2rem;
-              font-style: italic;
-              color: #888;
-            }
-            /* Estilos para mensajes de error */
-            .error-message {
-              color: #ff5252;
-              font-weight: bold;
-              white-space: pre-wrap;
-              font-family: monospace;
-              text-align: left;
-              padding: 10px;
-              background-color: rgba(255, 0, 0, 0.05);
-              border-left: 4px solid #ff5252;
-              margin: 8px 0;
-              overflow-x: auto;
-              display: block;
-              width: calc(100% - 20px);
-            }
-            
-            /* Enfatizar la línea con el nombre de la excepción */
-            .error-message-heading {
-              color: #ff3333;
-              font-size: 1.2em;
-              font-weight: bold;
-              font-family: monospace;
-              background-color: rgba(255, 0, 0, 0.1);
-              padding: 12px 10px;
-              margin: 15px 0 0 0;
-              border-left: 4px solid #ff3333;
-              border-top-left-radius: 3px;
-              border-top-right-radius: 3px;
-              text-align: left;
-              display: block;
-            }
-            
-            /* Stack trace con formato adecuado */
-            .stack-trace {
-              white-space: pre;
-              font-family: monospace;
-              color: #ff7777;
-              margin: 0;
-              padding: 5px 10px 5px 20px;
-              font-size: 0.9em;
-              background-color: rgba(255, 0, 0, 0.03);
-              border-left: 4px solid rgba(255, 82, 82, 0.5);
-              text-align: left;
-              display: block;
-            }
-          </style>
-        </head>
-        <body>
-          <h1>Lambda Running UI</h1>
-          <p>The full UI is coming soon. We're working on an elegant, powerful interface for testing your Lambda functions.</p>
-          <p class="loading">Loading resources...</p>
-        </body>
-        </html>
-      `);
-    });
-  }
-
-  // API endpoints
+  });
 
   // Get all Lambda handlers
   app.get('/api/handlers', (req, res) => {
@@ -621,6 +486,52 @@ async function start(options = {}) {
       });
     }
   });
+
+  // Now configure UI serving based on mode
+  if (developmentMode) {
+    global.systemLog('Development mode active, API server only (UI will be served by Vite)');
+  } else {
+    // Production mode - Serve UI from lib/ui-dist
+    const uiDistPath = path.join(moduleRoot, 'lib', 'ui-dist');
+    global.systemLog(`Serving UI from bundled files at ${uiDistPath}`);
+    
+    if (fs.existsSync(uiDistPath) && fs.existsSync(path.join(uiDistPath, 'index.html'))) {
+      global.systemLog(`UI static files found at ${uiDistPath}`);
+      
+      // Serve static files with proper cache control
+      app.use(express.static(uiDistPath, {
+        etag: true,
+        lastModified: true,
+        setHeaders: (res) => {
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+        }
+      }));
+      
+      // Handle root path explicitly - redirect to handlers view
+      app.get('/', (req, res) => {
+        res.redirect('/handlers');
+      });
+      
+      // Handle all assets with explicit paths
+      app.get('/assets/*', (req, res) => {
+        const assetPath = path.join(uiDistPath, req.path);
+        if (fs.existsSync(assetPath)) {
+          res.sendFile(assetPath);
+        } else {
+          global.systemLog(`Asset not found: ${assetPath}`);
+          res.status(404).send('Asset not found');
+        }
+      });
+      
+      // Serve index.html for all non-API routes (SPA routing)
+      app.get('*', (req, res, next) => {
+        if (req.path.startsWith('/api/')) {
+          return next();
+        }
+        res.sendFile(path.join(uiDistPath, 'index.html'));
+      });
+    }
+  }
 
   // Create HTTP server and Socket.io instance
   server = http.createServer(app);
@@ -859,7 +770,6 @@ async function stop() {
 module.exports = {
   start,
   stop,
-  // Exponer OutputCapture para pruebas
   __test_only_for_coverage__: {
     OutputCapture
   }
