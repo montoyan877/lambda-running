@@ -12,25 +12,15 @@ const Enquirer = require('enquirer');
 const fs = require('fs');
 const path = require('path');
 
-function requireWithFallback(libPath, srcPath) {
-  try {
-    return require(libPath);
-  } catch (e) {
-    try {
-      return require(srcPath);
-    } catch (err) {
-      throw new Error(`No se pudo cargar el módulo desde ${libPath} ni ${srcPath}: ${err.message}`);
-    }
-  }
-}
-
-const { runHandler, scanForHandlers } = requireWithFallback('../lib/lambda-runner', '../src/lambda-runner');
-const { saveEvent, getEvents, getEvent, deleteEvent } = requireWithFallback('../lib/event-store', '../src/event-store');
+// Load modules from src directory
+// During babel compilation, '../src/*' paths will be transformed to '../*'
+const { runHandler, scanForHandlers } = require('../src/lambda-runner');
+const { saveEvent, getEvents, getEvent, deleteEvent } = require('../src/event-store');
 
 // Import UI server module
 let uiServer;
 try {
-  uiServer = requireWithFallback('../lib/ui-server', '../src/ui-server');
+  uiServer = require('../src/ui-server');
 } catch (e) {
   // We'll check for existence more explicitly in the UI command
   // UI server is optional, so we'll gracefully handle missing dependency
@@ -257,15 +247,14 @@ program
       // Try to require ui-server if not already loaded
       if (!uiServer) {
         try {
-          uiServer = requireWithFallback('../lib/ui-server', '../src/ui-server');
+          uiServer = require('../src/ui-server');
         } catch (e) {
-          // Check if ui-server.js file exists in lib or src
-          const libUiServerPath = path.join(__dirname, '../lib/ui-server.js');
-          const srcUiServerPath = path.join(__dirname, '../src/ui-server.js');
+          // Check if ui-server.js file exists
+          const uiServerPath = path.join(__dirname, '../src/ui-server.js');
           
-          if (!fs.existsSync(libUiServerPath) && !fs.existsSync(srcUiServerPath)) {
+          if (!fs.existsSync(uiServerPath)) {
             console.error(
-              chalk.red('UI server module not found. The file is missing in both lib/ and src/ directories.')
+              chalk.red('UI server module not found. The file ui-server.js is missing.')
             );
             process.exit(1);
           }
@@ -310,25 +299,36 @@ program
   .description('Launch interactive web UI for testing Lambda functions')
   .option('-p, --port <port>', 'Port to run the UI server on', '3000')
   .option('--no-open', 'Do not automatically open browser')
-  .action(async () => {
+  .action(async (options) => {
     try {
-      // Check if we're in a recursive call to prevent infinite loops
-      if (process.env.LAMBDA_UI_RECURSION_CHECK === 'true') {
-        console.error(chalk.red('Detected recursive call to lambda-run ui. This is likely a bug.'));
-        process.exit(1);
+      // Try to require ui-start.js
+      try {
+        const uiStart = require('../lib/bin/ui-start');
+      } catch (e) {
+        // If it fails, try directly using the UI server
+        try {
+          uiServer = require('../src/ui-server');
+        } catch (e) {
+          console.error(
+            chalk.red('UI server module not found. The file ui-server.js is missing.')
+          );
+          process.exit(1);
+        }
+
+        console.log(chalk.blue('Starting Lambda Running UI server...'));
+
+        // Start UI server directly with API only (not development mode)
+        await uiServer.start({
+          port: parseInt(options.port, 10),
+          open: options.open !== false,
+          cwd: process.cwd(),
+          developmentMode: false,
+        });
+
+        console.log(
+          chalk.green(`Lambda Running UI server started on http://localhost:${options.port}`)
+        );
       }
-
-      // Import the uiStart module with all the enhanced functionality
-      const uiStart = require('./ui-start');
-
-      // Use the enhanced startLambdaEnv function from ui-start.js
-      await uiStart.startLambdaEnv({
-        rootDir: process.cwd(),
-        lambdaRunnerPath: path.join(__dirname, 'lambda-run.js'),
-        printBanner: true,
-      });
-
-      // Note: The startLambdaEnv function already handles SIGINT and process cleanup
     } catch (error) {
       console.error(chalk.red(`Error starting UI server: ${error.message}`));
       console.error(error.stack);

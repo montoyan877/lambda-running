@@ -319,31 +319,64 @@ async function start(options = {}) {
     return;
   }
 
-  port = options.port || 3000;
-  const cwd = options.cwd || process.cwd();
+  const startOptions = options || {};
+  const port = startOptions.port || 3000;
+  const shouldOpenBrowser = startOptions.open !== false;
+  const projectDir = startOptions.cwd || process.cwd();
+  const developmentMode = startOptions.developmentMode !== false;
+  const moduleRoot = startOptions.moduleRoot || path.dirname(__dirname);
+  
+  // Log startup mode
+  if (developmentMode) {
+    global.systemLog('Starting in development mode (with hot reloading)');
+  } else {
+    global.systemLog('Starting in production mode (serving compiled files)');
+  }
 
   // Configure middleware
   app.use(cors());
   app.use(express.json());
 
-  // First try to find UI in lib/ui-dist (optimized build)
-  let uiDistPath = path.join(__dirname, '..', 'lib', 'ui-dist');
+  // Serve UI from lib/ui-dist
+  let uiDistPath;
   
-  // Fallback to src/ui-dist if lib version doesn't exist
-  if (!fs.existsSync(uiDistPath) || !fs.existsSync(path.join(uiDistPath, 'index.html'))) {
-    uiDistPath = path.join(__dirname, 'ui-dist');
-  }
-  
-  if (fs.existsSync(uiDistPath) && fs.existsSync(path.join(uiDistPath, 'index.html'))) {
+  if (developmentMode) {
+    // In development mode, we expect to find the UI source in the 'ui' directory
+    uiDistPath = path.join(projectDir, 'ui');
+    global.systemLog(`Looking for UI source in ${uiDistPath}`);
+  } else {
+    // In production mode, look for compiled files in lib/ui-dist relative to the module root
+    uiDistPath = path.join(moduleRoot, 'lib', 'ui-dist');
     global.systemLog(`Serving UI from bundled files at ${uiDistPath}`);
+  }
+
+  if (!developmentMode && fs.existsSync(uiDistPath) && fs.existsSync(path.join(uiDistPath, 'index.html'))) {
+    global.systemLog(`UI static files found at ${uiDistPath}`);
     
     // Serve static files with proper cache control
     app.use(express.static(uiDistPath, {
       etag: true,
       lastModified: true,
-      maxAge: '1d', // Cache for 1 day
-      immutable: true
+      setHeaders: (res) => {
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+      }
     }));
+    
+    // Handle root path explicitly - redirect to handlers view
+    app.get('/', (req, res) => {
+      res.redirect('/handlers');
+    });
+    
+    // Handle all assets with explicit paths
+    app.get('/assets/*', (req, res) => {
+      const assetPath = path.join(uiDistPath, req.path);
+      if (fs.existsSync(assetPath)) {
+        res.sendFile(assetPath);
+      } else {
+        global.systemLog(`Asset not found: ${assetPath}`);
+        res.status(404).send('Asset not found');
+      }
+    });
     
     // Serve index.html for all non-API routes (SPA routing)
     app.get('*', (req, res, next) => {
@@ -352,7 +385,7 @@ async function start(options = {}) {
       }
       res.sendFile(path.join(uiDistPath, 'index.html'));
     });
-  } else {
+  } else if (developmentMode) {
     global.systemLog('UI dist folder not found, serving fallback page');
     // Serve placeholder page if ui-dist doesn't exist
     app.get('/', (req, res) => {
@@ -452,15 +485,15 @@ async function start(options = {}) {
   // Get all Lambda handlers
   app.get('/api/handlers', (req, res) => {
     try {
-      const handlers = scanForHandlers(cwd, ['.js', '.ts'], {
+      const handlers = scanForHandlers(projectDir, ['.js', '.ts'], {
         ignoreNodeModules: true,
         useIgnoreFile: true,
       });
 
-      // Transform paths to be relative to cwd
+      // Transform paths to be relative to projectDir
       const handlersWithRelativePaths = handlers.map((handler) => ({
         ...handler,
-        path: path.relative(cwd, handler.path).replace(/\\/g, '/'), // Convert Windows backslashes to forward slashes
+        path: path.relative(projectDir, handler.path).replace(/\\/g, '/'), // Convert Windows backslashes to forward slashes
       }));
 
       res.json({ handlers: handlersWithRelativePaths });
@@ -786,8 +819,9 @@ async function start(options = {}) {
       isRunning = true;
       global.systemLog(`Lambda Running UI server started on http://localhost:${port}`);
 
-      if (options.open) {
-        open(`http://localhost:${port}`);
+      if (shouldOpenBrowser) {
+        // Open directly to handlers route for better UX
+        open(`http://localhost:${port}/handlers`);
       }
 
       resolve();

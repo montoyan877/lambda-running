@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "build": "babel src -d lib",
+    "build": "babel src -d lib && babel bin -d lib/bin",
     "build:ui": "cd ui && npm run build",
     "clean:dist": "node scripts/clean-dist.js",
     "build:package": "npm run build && npm run build:ui && npm run clean:dist",
@@ -21,7 +21,7 @@
     "prepublishOnly": "npm run build:package"
   },
   "bin": {
-    "lambda-run": "bin/lambda-run.js"
+    "lambda-run": "lib/bin/lambda-run.js"
   },
   "keywords": [
     "aws",
@@ -45,10 +45,12 @@
   "dependencies": {
     "chalk": "^4.1.2",
     "commander": "^11.0.0",
+    "cors": "^2.8.5",
     "dotenv": "^16.0.2",
     "enquirer": "^2.4.1",
     "express": "^4.18.2",
-    "cors": "^2.8.5",
+    "external-editor": "^3.1.0",
+    "inquirer": "^8.2.6",
     "open": "^8.4.2",
     "socket.io": "^4.7.2",
     "ts-node": "^10.9.2"
@@ -58,6 +60,7 @@
     "@babel/core": "^7.22.10",
     "@babel/preset-env": "^7.22.10",
     "@types/node": "^18.7.23",
+    "babel-plugin-module-resolver": "^5.0.2",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.3",
@@ -71,7 +74,6 @@
     "node": ">=14.0.0"
   },
   "files": [
-    "bin/",
     "lib/",
     "README.md"
   ]
