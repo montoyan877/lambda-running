@@ -17,6 +17,7 @@
     "release": "npm run build:package && node scripts/release.js",
     "dev:tswatch": "tsc --watch",
     "ui:dev": "cd ui && npm run dev",
+    "dev": "node scripts/run-dev.js",
     "prepare": "npm run build",
     "prepublishOnly": "npm run build:package"
   },
