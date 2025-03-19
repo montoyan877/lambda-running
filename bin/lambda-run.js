@@ -5,20 +5,32 @@
  * Command line interface for running AWS Lambda functions locally with lambda-running library
  */
 
-const fs = require('fs');
-const path = require('path');
 const chalk = require('chalk');
 const { Command } = require('commander');
 const inquirer = require('inquirer');
 const Enquirer = require('enquirer');
+const fs = require('fs');
+const path = require('path');
 
-const { runHandler, scanForHandlers } = require('../src/lambda-runner');
-const { saveEvent, getEvents, getEvent, deleteEvent } = require('../src/event-store');
+function requireWithFallback(libPath, srcPath) {
+  try {
+    return require(libPath);
+  } catch (e) {
+    try {
+      return require(srcPath);
+    } catch (err) {
+      throw new Error(`No se pudo cargar el módulo desde ${libPath} ni ${srcPath}: ${err.message}`);
+    }
+  }
+}
+
+const { runHandler, scanForHandlers } = requireWithFallback('../lib/lambda-runner', '../src/lambda-runner');
+const { saveEvent, getEvents, getEvent, deleteEvent } = requireWithFallback('../lib/event-store', '../src/event-store');
 
 // Import UI server module
 let uiServer;
 try {
-  uiServer = require('../src/ui-server');
+  uiServer = requireWithFallback('../lib/ui-server', '../src/ui-server');
 } catch (e) {
   // We'll check for existence more explicitly in the UI command
   // UI server is optional, so we'll gracefully handle missing dependency
@@ -245,13 +257,15 @@ program
       // Try to require ui-server if not already loaded
       if (!uiServer) {
         try {
-          uiServer = require('../src/ui-server');
+          uiServer = requireWithFallback('../lib/ui-server', '../src/ui-server');
         } catch (e) {
-          // Check if ui-server.js file exists
-          const uiServerPath = path.join(__dirname, '../src/ui-server.js');
-          if (!fs.existsSync(uiServerPath)) {
+          // Check if ui-server.js file exists in lib or src
+          const libUiServerPath = path.join(__dirname, '../lib/ui-server.js');
+          const srcUiServerPath = path.join(__dirname, '../src/ui-server.js');
+          
+          if (!fs.existsSync(libUiServerPath) && !fs.existsSync(srcUiServerPath)) {
             console.error(
-              chalk.red('UI server module not found. The file src/ui-server.js is missing.')
+              chalk.red('UI server module not found. The file is missing in both lib/ and src/ directories.')
             );
             process.exit(1);
           }

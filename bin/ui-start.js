@@ -302,19 +302,31 @@ async function startApiServer(options = {}) {
     try {
       // First try to find it relative to this file
       const moduleRoot = findModuleRoot();
-      const uiServerPath = path.join(moduleRoot, 'src', 'ui-server.js');
+      
+      // Try lib directory first
+      const libUiServerPath = path.join(moduleRoot, 'lib', 'ui-server.js');
+      const srcUiServerPath = path.join(moduleRoot, 'src', 'ui-server.js');
 
-      if (fs.existsSync(uiServerPath)) {
-        uiServer = require(uiServerPath);
+      if (fs.existsSync(libUiServerPath)) {
+        uiServer = require(libUiServerPath);
+      } else if (fs.existsSync(srcUiServerPath)) {
+        uiServer = require(srcUiServerPath);
       } else {
         // If not found, try using the provided rootDir
-        const projectUiServerPath = path.join(options.rootDir, 'src', 'ui-server.js');
+        const projectLibUiServerPath = path.join(options.rootDir, 'lib', 'ui-server.js');
+        const projectSrcUiServerPath = path.join(options.rootDir, 'src', 'ui-server.js');
 
-        if (fs.existsSync(projectUiServerPath)) {
-          uiServer = require(projectUiServerPath);
+        if (fs.existsSync(projectLibUiServerPath)) {
+          uiServer = require(projectLibUiServerPath);
+        } else if (fs.existsSync(projectSrcUiServerPath)) {
+          uiServer = require(projectSrcUiServerPath);
         } else {
           // As a last resort, try resolving it directly
-          uiServer = require('lambda-running/src/ui-server');
+          try {
+            uiServer = require('lambda-running/lib/ui-server');
+          } catch (err) {
+            uiServer = require('lambda-running/src/ui-server');
+          }
         }
       }
     } catch (e) {

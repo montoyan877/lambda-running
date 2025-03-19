@@ -2,7 +2,7 @@
   "name": "lambda-running",
   "version": "0.2.2",
   "description": "Library for running and testing AWS Lambda functions locally with custom events",
-  "main": "src/index.js",
+  "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "scripts": {
     "test": "jest",

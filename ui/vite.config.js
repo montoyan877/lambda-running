@@ -6,7 +6,7 @@ import fs from 'fs';
 // https://vitejs.dev/config/
 export default defineConfig(() => {
   // Ensure target directory exists
-  const outDir = path.resolve(__dirname, '../src/ui-dist');
+  const outDir = path.resolve(__dirname, '../lib/ui-dist');
   if (!fs.existsSync(outDir)) {
     fs.mkdirSync(outDir, { recursive: true });
   }
