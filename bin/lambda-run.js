@@ -303,7 +303,7 @@ program
     try {
       // Try to require ui-start.js
       try {
-        const uiStart = require('../lib/bin/ui-start');
+        require('../lib/bin/ui-start');
       } catch (e) {
         // If it fails, try directly using the UI server
         try {

@@ -359,20 +359,17 @@ export default defineComponent({
     
     // Watch for fatal errors in logs and add them to result if not already set
     watch(() => currentLogs.value, (newLogs) => {
-      // Si hay logs de error pero no hay resultado (error fatal antes de resultado)
       if (newLogs.length > 0 && !currentResult.value && currentSessionId.value) {
         const errorLogs = newLogs.filter(log => log.type === 'error');
         
         if (errorLogs.length > 0) {
-          // Creamos un resultado con el error
           const errorMessages = errorLogs.map(log => log.message).join('\n');
           
-          // Solo agregamos el resultado si no existe
           if (!executionStore.getSessionResult(currentSessionId.value)) {
             executionStore.setErrorResult(
               currentSessionId.value, 
               { message: 'Fatal error', details: errorMessages },
-              Date.now() - errorLogs[0].timestamp // Calcular duración aproximada
+              Date.now() - errorLogs[0].timestamp
             );
           }
         }
@@ -450,26 +447,26 @@ export default defineComponent({
       }
     };
     
-    // Formatear el resultado para mostrarlo
+    // Format the result for display
     const formatResultOutput = (result) => {
       try {
         if (!result) return '{}';
 
         if (result.error) {
-          // Si es un objeto de error, formatear para mejor visualización
+          // If it's an error object, format for better visualization
           let errorObj = result.error;
           if (typeof errorObj === 'string') {
             errorObj = { message: errorObj };
           }
           
-          // Si tiene detalles, agregarlos
+          // If it has details, add them
           if (errorObj.details) {
             errorObj.details = errorObj.details.split('\n');
           }
           
           return JSON.stringify(errorObj, null, 2);
         } else {
-          // Si es un resultado exitoso
+          // If it's a successful result
           return JSON.stringify(result.result || {}, null, 2);
         }
       } catch (e) {
@@ -477,7 +474,7 @@ export default defineComponent({
       }
     };
     
-    // Formatear duración para mostrarla en segundos
+    // Format duration to display in seconds
     const formatDuration = (duration) => {
       if (duration < 1000) {
         return `${duration}ms`;
@@ -490,15 +487,12 @@ export default defineComponent({
     const getRelativePath = (path) => {
       if (!path) return '';
       
-      // Dividir la ruta y obtener las últimas partes
       const parts = path.split(/[\/\\]/);
       
-      // Si hay más de 2 partes, mostrar 'parent/file.js'
       if (parts.length > 2) {
         return `${parts[parts.length - 2]}/${parts[parts.length - 1]}`; 
       }
       
-      // Si hay solo 1 o 2 partes, mostrar solo el nombre del archivo
       return parts[parts.length - 1];
     };
     

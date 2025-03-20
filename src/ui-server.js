@@ -48,13 +48,13 @@ class OutputCapture {
     this.originalConsoleWarn = console.warn;
     this.originalConsoleInfo = console.info;
 
-    // Flag para marcar cuando estamos en modo captura
+    // Flag to mark when we are in capture mode
     this.isCapturing = false;
 
-    // Flag para identificar si estamos en código de handler o librería
+    // Flag to identify if we are in handler code or library code
     this.inHandlerCode = false;
 
-    // Lista de logs del sistema que deberíamos ignorar
+    // List of system logs that should be ignored
     this.systemLogs = [
       'Starting execution of handler:',
       'Loading environment variables from',
@@ -92,13 +92,13 @@ class OutputCapture {
   }
 
   start() {
-    // Activar captura
+    // Activate capture
     this.isCapturing = true;
 
-    // Emitir mensaje de inicio
+    // Emit start message
     this.emit('info', ['Lambda execution started']);
 
-    // Sobrescribir métodos de consola para capturar todo durante la ejecución
+    // Override console methods to capture everything during execution
     console.log = (...args) => {
       this.originalConsoleLog(...args);
       this.processLog('log', args);
@@ -121,38 +121,38 @@ class OutputCapture {
   }
 
   stop() {
-    // Desactivar captura
+    // Deactivate capture
     this.isCapturing = false;
 
-    // Restaurar métodos originales
+    // Restore original methods
     console.log = this.originalConsoleLog;
     console.error = this.originalConsoleError;
     console.warn = this.originalConsoleWarn;
     console.info = this.originalConsoleInfo;
   }
 
-  // Método para procesar logs y filtrar los que son del sistema
+  // Method to process logs and filter system logs
   processLog(type, args) {
     if (!this.isCapturing) return;
 
-    // Si es un log del sistema, no lo emitimos en absoluto
+    // If it's a system log, don't emit it at all
     if (this.isSystemLog(args)) {
       return;
     }
 
-    // Verificar si el primer argumento es un objeto Error (incluyendo excepciones como AuthenticationException)
+    // Check if the first argument is an Error object (including exceptions like AuthenticationException)
     if (args.length > 0 && args[0] instanceof Error) {
       const error = args[0];
-      // Obtenemos el nombre real de la clase de error usando constructor.name que es más fiable
+      // Get the real name of the error class using constructor.name which is more reliable
       const errorName = error.constructor.name || error.name || 'Error';
 
-      // Emitir el nombre de la excepción con formato especial
+      // Emit the exception name with special formatting
       this.emit('error', [`${errorName} [Error]`]);
 
-      // Emitir el stack trace sin la primera línea (que contiene el nombre y mensaje)
+      // Emit the stack trace without the first line (which contains the name and message)
       if (error.stack) {
         const stackLines = error.stack.split('\n');
-        // Solo emitir las líneas del stack sin la primera que ya contiene el error
+        // Only emit stack lines without the first one that already contains the error
         if (stackLines.length > 1) {
           this.emit('error', [stackLines.slice(1).join('\n')]);
         }
@@ -162,85 +162,85 @@ class OutputCapture {
       return;
     }
 
-    // Capturas específicas para errores y excepciones - debemos asegurarnos de mostrarlos siempre
+    // Specific captures for errors and exceptions - we must ensure they are always shown
     if (type === 'error' && args.length > 0) {
-      // Si el primer argumento es una cadena que contiene un error específico o stack trace,
-      // asegurarnos de mostrarlo incluso si contiene patrones de sistema
+      // If the first argument is a string that contains a specific error or stack trace,
+      // make sure to show it even if it contains system patterns
       const firstArg = String(args[0]);
 
-      // Detectar patrones específicos de errores y excepciones
+      // Detect specific patterns for errors and exceptions
       if (
         firstArg.includes('Error') ||
         firstArg.includes('Exception') ||
-        firstArg.includes('at ') || // Líneas de stack trace
+        firstArg.includes('at ') || // Stack trace lines
         firstArg.includes('Failed') ||
         firstArg.includes('Uncaught') ||
         /^\s+at\s/.test(firstArg)
       ) {
-        // Líneas de stack trace con indentación
+        // Stack trace lines with indentation
         this.emit('error', args);
         return;
       }
     }
 
-    // Si llegamos aquí, el log es de la lambda y debemos emitirlo
+    // If we get here, the log is from the lambda and should be emitted
     this.emit(type, args);
   }
 
-  // Método para determinar si un log es del sistema
+  // Method to determine if a log is from the system
   isSystemLog(args) {
     if (args.length === 0) return false;
 
-    // Si el primer argumento es un Error, NUNCA debe ser considerado un log del sistema
+    // If the first argument is an Error, it should NEVER be considered a system log
     if (args[0] instanceof Error) {
       return false;
     }
 
-    // Obtener el primer argumento como string para evaluarlo
+    // Get the first argument as string for evaluation
     const firstArg = String(args[0]);
 
-    // Si el log comienza con [SYSTEM], es un log de sistema y debe ser filtrado
+    // If the log starts with [SYSTEM], it's a system log and should be filtered
     if (typeof firstArg === 'string' && firstArg.startsWith('[SYSTEM]')) {
       return true;
     }
 
-    // Los errores y excepciones nunca deben ser considerados logs del sistema
+    // Errors and exceptions should never be considered system logs
     if (
       typeof firstArg === 'string' &&
       (firstArg.includes('Error') ||
         firstArg.includes('Exception') ||
-        firstArg.includes('at ') || // Para detectar líneas de stack trace
+        firstArg.includes('at ') || // To detect stack trace lines
         /^\s+at\s/.test(firstArg))
     ) {
-      // Para detectar líneas de stack trace con indentación
+      // To detect stack trace lines with indentation
       return false;
     }
 
-    // Si el log comienza con [LAMBDA], no es del sistema (es un log explícito del usuario)
+    // If the log starts with [LAMBDA], it's not from the system (it's an explicit user log)
     if (typeof firstArg === 'string' && firstArg.startsWith('[LAMBDA]')) {
-      // Quitamos el prefijo para que se vea más limpio
+      // Remove the prefix for cleaner output
       args[0] = firstArg.substring('[LAMBDA]'.length).trim();
       return false;
     }
 
-    // Si el mensaje proviene de un handler lambda, permitirlo
+    // If the message comes from a lambda handler, allow it
     if (this.inHandlerCode) {
       return false;
     }
 
-    // Verificar contra patrones conocidos de logs del sistema
+    // Check against known system log patterns
     for (const systemLogPrefix of this.systemLogs) {
       if (typeof firstArg === 'string' && firstArg.includes(systemLogPrefix)) {
         return true;
       }
     }
 
-    // Patrones adicionales basados en análisis de logs
-    // Verificar si es un log interno de la librería
+    // Additional patterns based on log analysis
+    // Check if it's an internal library log
     if (
       (typeof firstArg === 'string' &&
         /^\[.*?\]/.test(firstArg) &&
-        !firstArg.startsWith('[LAMBDA]')) || // Logs con formato [ALGO] que no sea [LAMBDA]
+        !firstArg.startsWith('[LAMBDA]')) || // Logs with [SOMETHING] format that are not [LAMBDA]
       firstArg.includes('lambda-running') ||
       firstArg.includes('Lambda Running') ||
       firstArg.includes('node_modules') ||
@@ -257,7 +257,7 @@ class OutputCapture {
   emit(type, args) {
     // Format and emit log messages to the client
     const formattedArgs = args.map((arg) => {
-      // No intentar JSON.stringify en objetos Error
+      // No attempt to JSON.stringify Error objects
       if (typeof arg === 'object' && arg !== null && !(arg instanceof Error)) {
         try {
           return JSON.stringify(arg, null, 2);
@@ -266,34 +266,34 @@ class OutputCapture {
         }
       }
 
-      // Convertir a string preservando el formato original
+      // Convert to string preserving original format
       return String(arg);
     });
 
-    // Combinar argumentos en un mensaje
+    // Combine arguments into a message
     let message = formattedArgs.join(' ');
 
-    // Eliminar TODOS los timestamps en CUALQUIER formato
+    // Remove ALL timestamps in ANY format
     message = message.replace(/\[\d{2}:\d{2}:\d{2}\]\s*/g, ''); // [HH:MM:SS]
-    message = message.replace(/\d{2}:\d{2}:\d{2}\s*/g, ''); // HH:MM:SS sin corchetes
-    message = message.replace(/^\s*Error\s*$/i, ''); // Solo la palabra "Error" sola
+    message = message.replace(/\d{2}:\d{2}:\d{2}\s*/g, ''); // HH:MM:SS without brackets
+    message = message.replace(/^\s*Error\s*$/i, ''); // Just the word "Error" alone
 
-    // Si después de limpiar el mensaje queda vacío, no enviarlo
+    // If after cleaning the message is empty, don't send it
     if (!message.trim()) {
       return;
     }
 
-    // Detectar si es un mensaje de excepción para aplicar formato especial
+    // Detect if it's an exception message to apply special formatting
     let errorClass = '';
 
-    // Detectar diferentes tipos de mensajes de error
+    // Detect different types of error messages
     if (type === 'error') {
-      // Encontrar el tipo de mensaje de error
+      // Find the type of error message
       if (message.includes('[Error]')) {
-        // Es una línea con el nombre de la excepción
+        // It's a line with the exception name
         errorClass = 'error-message-heading';
       } else if (message.trim().startsWith('at ') || /^\s+at\s/.test(message)) {
-        // Es una línea de stack trace
+        // It's a stack trace line
         errorClass = 'stack-trace';
       } else {
         // Generic error message

@@ -199,7 +199,7 @@ function setupGlobalLogging() {
  */
 async function runHandler(handlerPath, handlerMethod, event, context = {}, options = {}) {
   try {
-    // Configurar funciones globales de logging
+    // Setup global logging functions
     setupGlobalLogging();
     
     // Set default options
@@ -208,7 +208,7 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
       ...options,
     };
 
-    // Log de sistema usando systemLog - no será visible en el Output
+    // System log using systemLog - won't be visible in the Output
     global.systemLog(`Starting execution of handler: ${handlerPath} -> ${handlerMethod}`);
 
     // Resolve the absolute path if it's relative
@@ -285,8 +285,8 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
       // we need to ensure we capture the exact name of the exception
       
       if (handlerError instanceof Error) {
-        // Capturar el nombre exacto de la clase de error
-        // Hacemos el log de una manera especial para que se preserve el nombre de la clase
+        // Capture the exact name of the error class
+        // We log in a special way to preserve the class name
         console.log(`${handlerError.constructor.name || handlerError.name || 'Error'} [Error]`);
         
         // Log the stack trace if it exists, or the error message if there's no stack

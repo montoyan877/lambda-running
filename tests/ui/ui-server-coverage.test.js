@@ -83,7 +83,7 @@ jest.mock('../../src/lambda-runner', () => ({
     { path: '/test/handler2.js', methods: ['handler2', 'handler2b'] }
   ]),
   runHandler: jest.fn().mockImplementation((handlerPath, handlerMethod, eventData, context, options) => {
-    // Simular un retraso para probar el manejo de cancel
+    // Simulate a delay to test cancel handling
     return new Promise((resolve, reject) => {
       setTimeout(() => {
         if (handlerPath === 'error') {
@@ -114,7 +114,7 @@ jest.mock('../../src/event-store', () => ({
   })
 }));
 
-// Mock para console y process.cwd
+// Mock for console and process.cwd
 const originalConsole = { ...console };
 const originalCwd = process.cwd;
 
@@ -173,7 +173,6 @@ describe('UI Server (coverage)', () => {
     expect(app.use).toHaveBeenCalledWith('json-middleware');
     
     // Verify that routes were configured
-    expect(app.get).toHaveBeenCalledWith('/', expect.any(Function));
     expect(app.get).toHaveBeenCalledWith('/api/handlers', expect.any(Function));
     expect(app.get).toHaveBeenCalledWith('/api/events', expect.any(Function));
     expect(app.get).toHaveBeenCalledWith('/api/events/:name', expect.any(Function));

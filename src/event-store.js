@@ -186,12 +186,12 @@ function getEvent(name, category = 'default') {
     try {
       const eventContent = fs.readFileSync(eventPath, 'utf8');
       const data = JSON.parse(eventContent);
-      // Reconstruir el objeto con metadatos para mantener la estructura de retorno
+      // Rebuild the object with metadata to maintain the return structure
       return {
         name,
         category,
         timestamp: fs.statSync(eventPath).mtime.toISOString(),
-        data, // Ahora data contiene directamente el JSON del evento
+        data, // Now data directly contains the event JSON
         path: eventPath,
       };
     } catch (error) {

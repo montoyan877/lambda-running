@@ -236,7 +236,7 @@ export default defineComponent({
       toggleSidebar,
       runHandlerFromSidebar,
       isExecuting: computed(() => executionStore.isExecuting),
-      // Función para verificar si un handler específico está en ejecución
+      // Function to check if a specific handler is currently executing
       isHandlerExecuting: (handler) => {
         const activeHandler = handlersStore.activeHandler
         if (!activeHandler || !executionStore.isExecuting) return false

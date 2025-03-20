@@ -27,12 +27,12 @@ function isAllowed(filename) {
 
 // Make sure assets directory exists
 if (!fs.existsSync(assetsDir)) {
-  console.error(`El directorio de assets ${assetsDir} no existe!`);
+  console.error(`The assets directory ${assetsDir} does not exist!`);
   process.exit(1);
 }
 
 // Process assets
-console.log('Limpiando archivos no deseados de lib/ui-dist/assets:');
+console.log('Cleaning unwanted files from lib/ui-dist/assets:');
 let removedCount = 0;
 let keptCount = 0;
 let totalSize = 0;
@@ -56,23 +56,23 @@ for (const file of files) {
   if (!isAllowed(file)) {
     // Remove unwanted file
     fs.unlinkSync(filePath);
-    console.log(`Eliminado: ${file} (${fileSizeInKB.toFixed(2)} KB)`);
+    console.log(`Deleted: ${file} (${fileSizeInKB.toFixed(2)} KB)`);
     removedCount++;
     removedSize += fileSizeInBytes;
   } else {
-    console.log(`Conservado: ${file} (${fileSizeInKB.toFixed(2)} KB)`);
+    console.log(`Kept: ${file} (${fileSizeInKB.toFixed(2)} KB)`);
     keptCount++;
   }
 }
 
 // Show summary
 console.log('\n' + '='.repeat(50));
-console.log('Resumen de limpieza:');
-console.log(`- Total de archivos procesados: ${files.length}`);
-console.log(`- Archivos conservados: ${keptCount}`);
-console.log(`- Archivos eliminados: ${removedCount}`);
-console.log(`- Tamaño original: ${(totalSize / 1024).toFixed(2)} KB`);
-console.log(`- Tamaño eliminado: ${(removedSize / 1024).toFixed(2)} KB`);
-console.log(`- Tamaño final: ${((totalSize - removedSize) / 1024).toFixed(2)} KB`);
-console.log(`- Reducción: ${(removedSize / totalSize * 100).toFixed(2)}%`);
+console.log('Summary of cleanup:');
+console.log(`- Total files processed: ${files.length}`);
+console.log(`- Files kept: ${keptCount}`);
+console.log(`- Files deleted: ${removedCount}`);
+console.log(`- Original size: ${(totalSize / 1024).toFixed(2)} KB`);
+console.log(`- Deleted size: ${(removedSize / 1024).toFixed(2)} KB`);
+console.log(`- Final size: ${((totalSize - removedSize) / 1024).toFixed(2)} KB`);
+console.log(`- Reduction: ${(removedSize / totalSize * 100).toFixed(2)}%`);
 console.log('='.repeat(50)); 

@@ -44,7 +44,7 @@ export default defineConfig(({ mode }) => {
             'vue-router': 'VueRouter',
             pinia: 'Pinia'
           },
-          // Desactivar inlineDynamicImports para permitir manualChunks
+          // Disable inlineDynamicImports to allow manualChunks
           inlineDynamicImports: false,
           // Chunk configuration for large dependencies
           chunkFileNames: 'chunks/[name]-[hash].js',
