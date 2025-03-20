@@ -44,8 +44,6 @@ export const useExecutionStore = defineStore('execution', {
       this.socket.on('console', (data) => {
         const { sessionId, type, message, timestamp } = data;
         
-        console.log(`Debug - Received console event for session ${sessionId}:`, { type, message });
-        
         if (!sessionId) return;
         
         // Create session if it doesn't exist
@@ -54,16 +52,19 @@ export const useExecutionStore = defineStore('execution', {
             logs: [],
             result: null
           };
-          console.log(`Debug - Created new session: ${sessionId}`);
         }
         
+        // Add log to the session and force reactivity
         this.sessions[sessionId].logs.push({
           type: type || 'log',
           message: message || '',
           timestamp: new Date(timestamp) || Date.now()
         });
         
-        console.log(`Debug - Session ${sessionId} now has ${this.sessions[sessionId].logs.length} logs`);
+        // Make sure currentSessionId is set for new logs coming in
+        if (!this.currentSessionId && sessionId) {
+          this.currentSessionId = sessionId;
+        }
       });
       
       this.socket.on('execution-result', (data) => {
@@ -79,12 +80,18 @@ export const useExecutionStore = defineStore('execution', {
           };
         }
         
+        // Update the result
         this.sessions[sessionId].result = {
           result,
           error,
           duration,
           success
         };
+        
+        // Make sure currentSessionId is set for results
+        if (!this.currentSessionId && sessionId) {
+          this.currentSessionId = sessionId;
+        }
       });
       
       this.socket.on('execution-end', () => {
@@ -138,9 +145,9 @@ export const useExecutionStore = defineStore('execution', {
       } else {
         // If there's no socket connection, try with REST API
         axios.post('/api/run', {
-          path: handlerPath,
-          method: handlerMethod,
-          event: eventData,
+          handlerPath,
+          handlerMethod,
+          eventData,
           sessionId
         }).catch(error => {
           console.error('Error running handler:', error);
@@ -192,21 +199,33 @@ export const useExecutionStore = defineStore('execution', {
     },
     
     getSessionLogs(sessionId) {
-      if (!this.sessions[sessionId]) {
-        console.log(`Debug - No session found for ID: ${sessionId}`);
+      // If no session ID provided, use the current session
+      const targetSessionId = sessionId || this.currentSessionId;
+      
+      if (!targetSessionId) {
         return [];
       }
       
-      console.log(`Debug - getSessionLogs for ${sessionId}:`, this.sessions[sessionId].logs.length, "logs available");
-      return this.sessions[sessionId].logs;
+      if (!this.sessions[targetSessionId]) {
+        return [];
+      }
+      
+      return this.sessions[targetSessionId].logs;
     },
     
     getSessionResult(sessionId) {
-      if (!this.sessions[sessionId]) {
+      // If no session ID provided, use the current session
+      const targetSessionId = sessionId || this.currentSessionId;
+      
+      if (!targetSessionId) {
         return null;
       }
       
-      return this.sessions[sessionId].result;
+      if (!this.sessions[targetSessionId]) {
+        return null;
+      }
+      
+      return this.sessions[targetSessionId].result;
     },
     
     clearConsole(sessionId) {

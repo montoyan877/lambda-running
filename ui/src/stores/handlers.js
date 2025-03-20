@@ -138,7 +138,7 @@ export const useHandlersStore = defineStore('handlers', {
         }
         
         // Get the event data to use
-        // This would be set by the component to the current event data on screen
+        // Try to get from the existing data (might be set by HandlerView)
         let eventData = {}
         
         // Check if there's a favorite event for this handler
@@ -153,26 +153,42 @@ export const useHandlersStore = defineStore('handlers', {
             eventData = lastEvent
             notify.info('Using last executed event')
           } else {
+            // Use an empty object as fallback
+            eventData = {}
             notify.info('Using empty event')
           }
         }
         
         // Run the handler
         try {
-          const sessionId = executionStore.runHandler(
-            handler.path, 
-            handler.method, 
-            eventData
-          )
-          
-          if (sessionId) {
-            // Successfully started execution
-            notify.success(`Running handler: ${handler.relativePath} -> ${handler.method}`)
+          // Make sure the execution store socket is connected
+          if (!executionStore.socketConnected) {
+            executionStore.connectSocket()
+            // Give it a moment to connect
+            setTimeout(() => {
+              this.runWithEvent(executionStore, handler, eventData)
+            }, 300)
+          } else {
+            this.runWithEvent(executionStore, handler, eventData)
           }
         } catch (error) {
           notify.error(`Failed to run handler: ${error.message}`)
         }
       }, 100) // Short delay to ensure navigation has completed
+    },
+    
+    // Helper function to run with event data
+    runWithEvent(executionStore, handler, eventData) {
+      const sessionId = executionStore.runHandler(
+        handler.path, 
+        handler.method, 
+        eventData
+      )
+      
+      if (sessionId) {
+        // Successfully started execution
+        notify.success(`Running handler: ${handler.relativePath || this.getRelativePath(handler.path)} -> ${handler.method}`)
+      }
     },
     
     // Stop the execution of a running handler

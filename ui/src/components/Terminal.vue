@@ -44,7 +44,6 @@ export default defineComponent({
     // Expose method to clear terminal - for compatibility with previous implementation
     const clear = () => {
       // This is now handled by parent component clearing the logs array
-      console.log('Terminal clear requested');
     };
     
     return {

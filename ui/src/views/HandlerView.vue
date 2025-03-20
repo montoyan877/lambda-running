@@ -241,11 +241,6 @@ export default defineComponent({
     const currentSessionId = ref(null);
     const showSaveEventModal = ref(false);
     
-    // Toggle dropdown menus
-    const toggleEventOptions = () => {
-      console.log('Esta funcionalidad ha sido temporalmente desactivada');
-    };
-    
     // On mount, initialize
     onMounted(() => {
       // Connect to socket
@@ -328,15 +323,41 @@ export default defineComponent({
     const isLoadingEvents = computed(() => eventsStore.isLoading);
     
     const currentLogs = computed(() => {
-      if (!currentSessionId.value) return [];
-      const logs = executionStore.getSessionLogs(currentSessionId.value);
-      console.log(`Debug - Current logs for session ${currentSessionId.value}:`, logs);
-      return logs;
+      // First check for current session ID
+      if (currentSessionId.value) {
+        const logs = executionStore.getSessionLogs(currentSessionId.value);
+        if (logs && logs.length > 0) {
+          return logs;
+        }
+      }
+      
+      // If not set or empty, check current active session in execution store
+      const globalSessionId = executionStore.currentSessionId;
+      if (globalSessionId && globalSessionId !== currentSessionId.value) {
+        currentSessionId.value = globalSessionId;
+        return executionStore.getSessionLogs(globalSessionId);
+      }
+      
+      return [];
     });
     
     const currentResult = computed(() => {
-      if (!currentSessionId.value) return null;
-      return executionStore.getSessionResult(currentSessionId.value);
+      // First check for current session ID
+      if (currentSessionId.value) {
+        const result = executionStore.getSessionResult(currentSessionId.value);
+        if (result) {
+          return result;
+        }
+      }
+      
+      // If not set, check current active session in execution store
+      const globalSessionId = executionStore.currentSessionId;
+      if (globalSessionId && globalSessionId !== currentSessionId.value) {
+        currentSessionId.value = globalSessionId;
+        return executionStore.getSessionResult(globalSessionId);
+      }
+      
+      return null;
     });
     
     // Watch for changes in current result to update execution history
@@ -376,6 +397,26 @@ export default defineComponent({
       }
     }, { deep: true });
     
+    // Watch for changes in execution store session ID
+    watch(() => executionStore.currentSessionId, (newSessionId) => {
+      if (newSessionId && newSessionId !== currentSessionId.value) {
+        currentSessionId.value = newSessionId;
+      }
+    });
+    
+    // Watch for changes in execution store logs
+    watch(() => {
+      if (executionStore.currentSessionId) {
+        return executionStore.getSessionLogs(executionStore.currentSessionId);
+      }
+      return [];
+    }, (newLogs) => {
+      if (newLogs && newLogs.length > 0 && executionStore.currentSessionId) {
+        // Make sure our current session matches the execution store
+        currentSessionId.value = executionStore.currentSessionId;
+      }
+    }, { deep: true });
+    
     // Methods
     const runHandler = async () => {
       if (!currentHandler.value || isExecuting.value) return;
@@ -389,12 +430,35 @@ export default defineComponent({
           handlerEventsStore.saveLastEvent(currentHandler.value.id, parsedEvent);
         }
         
-        // Execute the handler
-        currentSessionId.value = executionStore.runHandler(
-          currentHandler.value.path,
-          currentHandler.value.method,
-          parsedEvent
-        );
+        // Make sure the execution store socket is connected
+        if (!executionStore.socketConnected) {
+          executionStore.connectSocket();
+          
+          // Give it a moment to connect
+          setTimeout(() => {
+            // Execute the handler
+            const sessionId = executionStore.runHandler(
+              currentHandler.value.path,
+              currentHandler.value.method,
+              parsedEvent
+            );
+            
+            if (sessionId) {
+              currentSessionId.value = sessionId;
+            }
+          }, 300);
+        } else {
+          // Execute the handler
+          const sessionId = executionStore.runHandler(
+            currentHandler.value.path,
+            currentHandler.value.method,
+            parsedEvent
+          );
+          
+          if (sessionId) {
+            currentSessionId.value = sessionId;
+          }
+        }
       } catch (error) {
         notify.error(`Invalid JSON event data: ${error.message}`);
       }
@@ -526,8 +590,7 @@ export default defineComponent({
       handleSaveEvent,
       formatDuration,
       formatResultOutput,
-      getRelativePath,
-      toggleEventOptions
+      getRelativePath
     };
   }
 });
