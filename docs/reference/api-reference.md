@@ -406,3 +406,22 @@ When running a handler, Lambda Running simulates the AWS Lambda context object. 
 ```
 
 You can override these values by providing a custom context object to `runHandler`. 
+
+// Configuration object structure
+interface LambdaRunningConfig {
+  // Layer configuration
+  layers?: string[];                  // Simple array of layer names
+  layerMappings?: {                   // Map of lambda layer paths to local paths
+    [layerPath: string]: string;      // e.g. "/opt/nodejs/my-lib": "./layers/my-lib"
+  };
+  
+  // Environment variables
+  envFiles?: string[];                // Array of env files to load (e.g. [".env", ".env.local"])
+  
+  // Handler discovery
+  ignorePatterns?: string[];          // Glob patterns to ignore when scanning for handlers
+  ignoreLayerFilesOnScan?: boolean;   // Whether to ignore files in layers dir during scan
+  
+  // Debug settings
+  debug?: boolean;                    // Enable debug mode for verbose logging
+} 

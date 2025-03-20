@@ -80,7 +80,7 @@ Lambda Running works with zero configuration, but you can customize:
 
 ### 📦 Lambda Layers
 
-Enable AWS Lambda layers support by creating a `lambdarunning.config.json` file in your project root:
+Enable AWS Lambda layers support by creating a `lambda-running.json` file in your project root:
 
 ```json
 {

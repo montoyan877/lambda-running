@@ -118,18 +118,18 @@ function shouldIgnore(filePath, ignorePatterns) {
   // Normalize the path to use forward slashes for consistent matching
   const normalizedPath = filePath.replace(/\\/g, '/');
   const fileName = path.basename(filePath);
-  
+
   for (const pattern of ignorePatterns) {
     // Normalize pattern to use forward slashes
     const normalizedPattern = pattern.replace(/\\/g, '/');
-    
+
     // Check for ** glob patterns (matches any directory recursively)
     if (normalizedPattern.includes('**')) {
       // Convert ** to regex: dir/** becomes dir/.*
       const regexPattern = normalizedPattern
         .replace(/\./g, '\\.') // Escape dots
         .replace(/\*\*/g, '.*'); // ** becomes .*
-        
+
       const regex = new RegExp(regexPattern);
       if (regex.test(normalizedPath)) {
         return true;
@@ -141,12 +141,12 @@ function shouldIgnore(filePath, ignorePatterns) {
       const regexPattern = normalizedPattern
         .replace(/\./g, '\\.') // Escape dots
         .replace(/\*/g, '.*'); // * becomes .*
-        
+
       const regex = new RegExp(`^${regexPattern}$`);
       if (regex.test(fileName) || regex.test(normalizedPath)) {
         return true;
       }
-    } 
+    }
     // Simple direct matching - check both filename and full path
     else if (fileName === normalizedPattern || normalizedPath.includes(`/${normalizedPattern}/`)) {
       return true;
@@ -188,7 +188,7 @@ function loadEnvFile(directory, envFile = '.env') {
           // Remove quotes around the value if present
           if (
             (value.startsWith('"') && value.endsWith('"')) ||
-            (value.startsWith('\'') && value.endsWith('\''))
+            (value.startsWith("'") && value.endsWith("'"))
           ) {
             value = value.substring(1, value.length - 1);
           }
@@ -217,7 +217,7 @@ function setupGlobalLogging() {
   global.lambdaLog = (...args) => {
     console.log(`[LAMBDA] ${args.join(' ')}`);
   };
-  
+
   // Global function to print system logs (which will be filtered and won't appear in the Output)
   global.systemLog = (...args) => {
     console.info(`[SYSTEM] ${args.join(' ')}`);
@@ -238,7 +238,7 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
   try {
     // Setup global logging functions
     setupGlobalLogging();
-    
+
     // Set default options
     const opts = {
       loadEnv: true,
@@ -252,16 +252,16 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
 
     // Get the directory of the handler file
     const handlerDir = path.dirname(absolutePath);
-    
+
     // Load configuration based on handler directory first, then fallback to cwd
     // This ensures that we find the config appropriate for this specific handler
     lambdaRunningConfig = loadConfig(handlerDir);
-    
+
     // Make sure we have the layer resolver initialized
     if (lambdaRunningConfig.debug) {
       global.systemLog(`Initializing layer resolver for ${path.basename(absolutePath)}`);
     }
-    
+
     // We always initialize the layer resolver for running a handler
     // This ensures that '/opt/nodejs/...' imports will be resolved
     initializeLayerResolver(lambdaRunningConfig);
@@ -272,9 +272,12 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
     // Load environment variables from .env if enabled
     if (opts.loadEnv) {
       // If config specifies env files, use those, otherwise use default .env
-      const envFiles = lambdaRunningConfig && lambdaRunningConfig.envFiles ? lambdaRunningConfig.envFiles : ['.env'];
+      const envFiles =
+        lambdaRunningConfig && lambdaRunningConfig.envFiles
+          ? lambdaRunningConfig.envFiles
+          : ['.env'];
       let envVars = {};
-      
+
       // Load each env file in order
       for (const envFile of envFiles) {
         const vars = loadEnvFile(process.cwd(), envFile);
@@ -304,7 +307,9 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
       // Check for a tsconfig.json specific to the handler's directory
       const dirTsConfigPath = path.join(handlerDir, 'tsconfig.json');
       if (fs.existsSync(dirTsConfigPath) && path.dirname(absolutePath) !== process.cwd()) {
-        global.systemLog(`Using TypeScript configuration from handler directory: ${dirTsConfigPath}`);
+        global.systemLog(
+          `Using TypeScript configuration from handler directory: ${dirTsConfigPath}`
+        );
       }
     }
 
@@ -378,13 +383,16 @@ function scanForHandlers(directory, extensions = ['.js', '.ts'], options = {}) {
     const ignoreFilePatterns = readIgnoreFile(directory);
     ignorePatterns = [...ignorePatterns, ...ignoreFilePatterns];
   }
-  
+
   // Add any additional ignore patterns from configuration
-  if (lambdaRunningConfig && lambdaRunningConfig.ignorePatterns && 
-      Array.isArray(lambdaRunningConfig.ignorePatterns)) {
+  if (
+    lambdaRunningConfig &&
+    lambdaRunningConfig.ignorePatterns &&
+    Array.isArray(lambdaRunningConfig.ignorePatterns)
+  ) {
     ignorePatterns = [...ignorePatterns, ...lambdaRunningConfig.ignorePatterns];
   }
-  
+
   // If ignoreLayerFilesOnScan is enabled, ignore files in layers directory
   if (lambdaRunningConfig && lambdaRunningConfig.ignoreLayerFilesOnScan) {
     const layersDir = path.join(directory, 'layers/**');
@@ -392,15 +400,15 @@ function scanForHandlers(directory, extensions = ['.js', '.ts'], options = {}) {
       global.systemLog(`Ignoring layer files during scan: ${layersDir}`);
     }
     ignorePatterns.push(layersDir);
-    
+
     // Also ignore layer paths from layerMappings
     if (lambdaRunningConfig.layerMappings) {
-      Object.values(lambdaRunningConfig.layerMappings).forEach(localPath => {
+      Object.values(lambdaRunningConfig.layerMappings).forEach((localPath) => {
         // If path is relative, make it absolute
-        const absolutePath = path.isAbsolute(localPath) 
-          ? localPath 
+        const absolutePath = path.isAbsolute(localPath)
+          ? localPath
           : path.join(directory, localPath);
-        
+
         if (lambdaRunningConfig.debug) {
           global.systemLog(`Ignoring layer mapping path during scan: ${absolutePath}`);
         }
@@ -428,9 +436,9 @@ function scanDirectory(directory, extensions, ignorePatterns) {
       // Skip files/directories that match ignore patterns
       if (shouldIgnore(filePath, ignorePatterns)) {
         if (lambdaRunningConfig && lambdaRunningConfig.debug) {
-          global.systemLog ? 
-            global.systemLog(`Ignoring file due to pattern match: ${filePath}`) : 
-            console.log(`Ignoring file due to pattern match: ${filePath}`);
+          global.systemLog
+            ? global.systemLog(`Ignoring file due to pattern match: ${filePath}`)
+            : console.log(`Ignoring file due to pattern match: ${filePath}`);
         }
         continue;
       }
@@ -448,9 +456,9 @@ function scanDirectory(directory, extensions, ignorePatterns) {
             // Check if it's a TypeScript file and ts-node is not available
             const isTypeScript = ext === '.ts';
             if (isTypeScript && !tsNodeAvailable) {
-              global.systemLog ? 
-                global.systemLog(`Skipping TypeScript file (ts-node not available): ${filePath}`) : 
-                console.warn(`Skipping TypeScript file (ts-node not available): ${filePath}`);
+              global.systemLog
+                ? global.systemLog(`Skipping TypeScript file (ts-node not available): ${filePath}`)
+                : console.warn(`Skipping TypeScript file (ts-node not available): ${filePath}`);
               continue;
             }
 
@@ -473,11 +481,13 @@ function scanDirectory(directory, extensions, ignorePatterns) {
             if (methods.length > 0) {
               // This is a valid handler file
               if (lambdaRunningConfig && lambdaRunningConfig.debug) {
-                global.systemLog ? 
-                  global.systemLog(`Found handler: ${filePath} with methods: ${methods.join(', ')}`) : 
-                  console.log(`Found handler: ${filePath} with methods: ${methods.join(', ')}`);
+                global.systemLog
+                  ? global.systemLog(
+                      `Found handler: ${filePath} with methods: ${methods.join(', ')}`
+                    )
+                  : console.log(`Found handler: ${filePath} with methods: ${methods.join(', ')}`);
               }
-              
+
               results.push({
                 path: filePath,
                 methods,
@@ -486,44 +496,56 @@ function scanDirectory(directory, extensions, ignorePatterns) {
           } catch (error) {
             // Make sure to restore the resolver in case of errors
             restoreOriginalResolver();
-            
+
             // If it contains code that suggests it's a handler but failed due to layers
-            const isHandlerWithLayerImport = 
-              (error.message && error.message.includes('Cannot find module \'/opt/nodejs/')) && 
+            const isHandlerWithLayerImport =
+              error.message &&
+              error.message.includes("Cannot find module '/opt/nodejs/") &&
               // Check if the file is not inside a 'layers' directory but is trying to use layers
               !filePath.includes(path.sep + 'layers' + path.sep) &&
               // Has 'exports.handler' or 'module.exports.handler' in its content
               fs.readFileSync(filePath, 'utf8').match(/(?:exports|module\.exports)\.handler\s*=/);
-            
+
             if (isHandlerWithLayerImport) {
               // This is likely a handler that uses layers
-              global.systemLog ? 
-                global.systemLog(`Found handler with layer imports: ${filePath} (will be available at runtime)`) : 
-                console.log(`Found handler with layer imports: ${filePath} (will be available at runtime)`);
-              
+              if (lambdaRunningConfig.debug) {
+                global.systemLog
+                  ? global.systemLog(
+                      `Found handler with layer imports: ${filePath} (will be available at runtime)`
+                    )
+                  : console.log(
+                      `Found handler with layer imports: ${filePath} (will be available at runtime)`
+                    );
+              }
+
               results.push({
                 path: filePath,
                 methods: ['handler'],
               });
-            } else if (error.message && error.message.includes('Cannot find module \'/opt/nodejs/')) {
+            } else if (
+              error.message &&
+              error.message.includes("Cannot find module '/opt/nodejs/")
+            ) {
               // This is likely a layer file that imports from other layers
-              global.systemLog ? 
-                global.systemLog(`Skipping layer file (imports from other layers): ${filePath}`) : 
-                console.warn(`Skipping layer file (imports from other layers): ${filePath}`);
+              global.systemLog
+                ? global.systemLog(`Skipping layer file (imports from other layers): ${filePath}`)
+                : console.warn(`Skipping layer file (imports from other layers): ${filePath}`);
             } else {
               // Log other errors
-              global.systemLog ? 
-                global.systemLog(`Could not load potential handler: ${filePath} - ${error.message}`) : 
-                console.warn(`Could not load potential handler: ${filePath}`, error.message);
+              global.systemLog
+                ? global.systemLog(
+                    `Could not load potential handler: ${filePath} - ${error.message}`
+                  )
+                : console.warn(`Could not load potential handler: ${filePath}`, error.message);
             }
           }
         }
       }
     }
   } catch (error) {
-    global.systemLog ? 
-      global.systemLog(`Error scanning directory ${directory}: ${error.message}`) : 
-      console.error(`Error scanning directory ${directory}:`, error);
+    global.systemLog
+      ? global.systemLog(`Error scanning directory ${directory}: ${error.message}`)
+      : console.error(`Error scanning directory ${directory}:`, error);
   }
 
   return results;

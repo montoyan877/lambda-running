@@ -51,11 +51,11 @@ exports.handler = async (event) => {
 You can configure Lambda Running to load from multiple `.env` files:
 
 ```json
-// lambdarunning.config.json
+// lambda-running.json
 {
   "envFiles": [
-    ".env",            // Base variables
-    ".env.development" // Environment-specific overrides
+    ".env",
+    ".env.local"
   ]
 }
 ```
@@ -70,7 +70,7 @@ my-project/
 ├── .env.development      # Development-specific variables 
 ├── .env.test             # Testing-specific variables
 ├── .env.production       # Production-like variables
-└── lambdarunning.config.json
+└── lambda-running.json
 ```
 
 ## 📄 .env File Format

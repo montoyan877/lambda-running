@@ -25,7 +25,9 @@ Set up your project with a directory structure that matches AWS Lambda layers:
 
 ```
 my-project/
-├── lambdarunning.config.json
+├── package.json
+├── tsconfig.json
+├── lambda-running.json
 ├── handlers/
 │   └── my-handler.js
 └── layers/
@@ -37,7 +39,7 @@ my-project/
 
 ### 2. Configure Lambda Running
 
-Create a `lambdarunning.config.json` file in your project root with your layer configuration:
+Create a `lambda-running.json` file in your project root with your layer configuration:
 
 #### Simple Configuration
 

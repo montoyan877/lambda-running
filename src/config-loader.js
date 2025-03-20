@@ -1,6 +1,6 @@
 /**
  * Configuration loader for Lambda Running
- * Handles loading and validation of lambdarunning.config.json
+ * Handles loading and validation of lambda-running.json
  */
 
 const fs = require('fs');
@@ -20,7 +20,7 @@ const defaultConfig = {
 };
 
 /**
- * Find the lambdarunning.config.json file in multiple possible locations
+ * Find the lambda-running.json file in multiple possible locations
  * @param {string} startDir - Directory to start searching from
  * @returns {string|null} - Path to config file or null if not found
  */
@@ -28,13 +28,15 @@ function findConfigFile(startDir) {
   // Try multiple possible locations
   const possibleLocations = [
     // Direct location
+    path.join(startDir, 'lambda-running.json'),
+    // Look for legacy config name for backward compatibility
     path.join(startDir, 'lambdarunning.config.json'),
     // Look in parent directory
-    path.join(path.dirname(startDir), 'lambdarunning.config.json'),
+    path.join(path.dirname(startDir), 'lambda-running.json'),
     // Look in project root (process.cwd())
-    path.join(process.cwd(), 'lambdarunning.config.json'),
+    path.join(process.cwd(), 'lambda-running.json'),
     // Look in examples directory if we're in the example
-    path.join(startDir, '..', 'lambdarunning.config.json'),
+    path.join(startDir, '..', 'lambda-running.json'),
     // Look in .lambda-running directory
     path.join(startDir, '.lambda-running', 'config.json'),
     path.join(process.cwd(), '.lambda-running', 'config.json')
@@ -68,7 +70,7 @@ function logMessage(message, level = 'info') {
 }
 
 /**
- * Load configuration from a lambdarunning.config.json file
+ * Load configuration from a lambda-running.json file
  * @param {string} projectDir - Directory to search for config file
  * @returns {Object} - Configuration object
  */
@@ -94,7 +96,7 @@ function loadConfig(projectDir) {
     } else {
       // Only log a warning if we're in debug mode
       if (config.debug) {
-        logMessage('No lambdarunning.config.json found, using default configuration', 'warn');
+        logMessage('No lambda-running.json found, using default configuration', 'warn');
       }
     }
   } catch (error) {
