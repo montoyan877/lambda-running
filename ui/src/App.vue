@@ -225,7 +225,7 @@ export default defineComponent({
     })
     
     return {
-      version: '0.1.0',
+      version: '0.2.3',
       isLoadingHandlers: computed(() => handlersStore.isLoading),
       handlerError: computed(() => handlersStore.error),
       groupedHandlers: computed(() => handlersStore.groupedHandlers),
