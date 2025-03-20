@@ -5,6 +5,11 @@
 
 const path = require('path');
 const fs = require('fs');
+const { loadConfig } = require('./config-loader');
+const { initializeLayerResolver, restoreOriginalResolver } = require('./layer-resolver');
+
+// Global config object
+let lambdaRunningConfig = null;
 
 // Check if ts-node is installed
 let tsNodeAvailable = false;
@@ -110,16 +115,40 @@ function readIgnoreFile(directory) {
  * @returns {boolean} - True if path should be ignored
  */
 function shouldIgnore(filePath, ignorePatterns) {
-  const relativePath = path.basename(filePath);
-
+  // Normalize the path to use forward slashes for consistent matching
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  const fileName = path.basename(filePath);
+  
   for (const pattern of ignorePatterns) {
-    // Simple globbing support for * as wildcard
-    if (pattern.includes('*')) {
-      const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
-      if (regex.test(relativePath)) {
+    // Normalize pattern to use forward slashes
+    const normalizedPattern = pattern.replace(/\\/g, '/');
+    
+    // Check for ** glob patterns (matches any directory recursively)
+    if (normalizedPattern.includes('**')) {
+      // Convert ** to regex: dir/** becomes dir/.*
+      const regexPattern = normalizedPattern
+        .replace(/\./g, '\\.') // Escape dots
+        .replace(/\*\*/g, '.*'); // ** becomes .*
+        
+      const regex = new RegExp(regexPattern);
+      if (regex.test(normalizedPath)) {
         return true;
       }
-    } else if (relativePath === pattern || filePath.includes(`/${pattern}/`)) {
+    }
+    // Check for * glob pattern (matches any characters in a single directory)
+    else if (normalizedPattern.includes('*')) {
+      // Convert * to regex: *.js becomes .*\.js
+      const regexPattern = normalizedPattern
+        .replace(/\./g, '\\.') // Escape dots
+        .replace(/\*/g, '.*'); // * becomes .*
+        
+      const regex = new RegExp(`^${regexPattern}$`);
+      if (regex.test(fileName) || regex.test(normalizedPath)) {
+        return true;
+      }
+    } 
+    // Simple direct matching - check both filename and full path
+    else if (fileName === normalizedPattern || normalizedPath.includes(`/${normalizedPattern}/`)) {
       return true;
     }
   }
@@ -128,33 +157,35 @@ function shouldIgnore(filePath, ignorePatterns) {
 }
 
 /**
- * Load environment variables from .env file if it exists
- * @param {string} directory - Directory where to look for .env file
- * @returns {Object} - Environment variables loaded from .env file
+ * Load environment variables from .env file
+ * @param {string} directory - Directory containing .env file
+ * @param {string} envFile - Name of the env file (default: '.env')
+ * @returns {object} - Object with environment variables
  */
-function loadEnvFile(directory) {
-  const envVars = {};
+function loadEnvFile(directory, envFile = '.env') {
+  const dotenv = {};
+
   try {
-    const envFilePath = path.join(directory, '.env');
+    const dotenvPath = path.join(directory, envFile);
+    if (fs.existsSync(dotenvPath)) {
+      const content = fs.readFileSync(dotenvPath, 'utf8');
+      const lines = content.split('\n');
 
-    if (fs.existsSync(envFilePath)) {
-      global.systemLog ? global.systemLog(`Loading environment variables from ${envFilePath}`) : 
-        console.log(`Loading environment variables from ${envFilePath}`);
-      
-      const content = fs.readFileSync(envFilePath, 'utf8');
-      const lines = content
-        .split('\n')
-        .map((line) => line.trim())
-        .filter((line) => line && !line.startsWith('#'));
+      lines.forEach((line) => {
+        line = line.trim();
+        // Skip empty lines and comments
+        if (line === '' || line.startsWith('#')) {
+          return;
+        }
 
-      for (const line of lines) {
-        // Parse key=value format
+        // Parse line as KEY=VALUE
         const match = line.match(/^([^=]+)=(.*)$/);
         if (match) {
-          const key = match[1].trim();
-          let value = match[2].trim();
+          let [, key, value] = match;
+          key = key.trim();
+          value = value.trim();
 
-          // Remove quotes if present
+          // Remove quotes around the value if present
           if (
             (value.startsWith('"') && value.endsWith('"')) ||
             (value.startsWith('\'') && value.endsWith('\''))
@@ -162,16 +193,22 @@ function loadEnvFile(directory) {
             value = value.substring(1, value.length - 1);
           }
 
-          envVars[key] = value;
+          dotenv[key] = value;
         }
+      });
+
+      global.systemLog(`Loading environment variables from ${dotenvPath}`);
+    } else {
+      // Env file doesn't exist, but that's okay - just continue without it
+      if (envFile === '.env') {
+        global.systemLog('No .env file found, continuing without it');
       }
     }
   } catch (error) {
-    global.systemLog ? global.systemLog(`Could not read .env file: ${error.message}`) : 
-      console.warn('Could not read .env file:', error.message);
+    global.systemLog(`Error loading ${envFile}: ${error.message}`);
   }
 
-  return envVars;
+  return dotenv;
 }
 
 // Add global function to facilitate explicit logging for Lambda Running
@@ -208,9 +245,6 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
       ...options,
     };
 
-    // System log using systemLog - won't be visible in the Output
-    global.systemLog(`Starting execution of handler: ${handlerPath} -> ${handlerMethod}`);
-
     // Resolve the absolute path if it's relative
     const absolutePath = path.isAbsolute(handlerPath)
       ? handlerPath
@@ -218,10 +252,34 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
 
     // Get the directory of the handler file
     const handlerDir = path.dirname(absolutePath);
+    
+    // Load configuration based on handler directory first, then fallback to cwd
+    // This ensures that we find the config appropriate for this specific handler
+    lambdaRunningConfig = loadConfig(handlerDir);
+    
+    // Make sure we have the layer resolver initialized
+    if (lambdaRunningConfig.debug) {
+      global.systemLog(`Initializing layer resolver for ${path.basename(absolutePath)}`);
+    }
+    
+    // We always initialize the layer resolver for running a handler
+    // This ensures that '/opt/nodejs/...' imports will be resolved
+    initializeLayerResolver(lambdaRunningConfig);
+
+    // System log using systemLog - won't be visible in the Output
+    global.systemLog(`Starting execution of handler: ${handlerPath} -> ${handlerMethod}`);
 
     // Load environment variables from .env if enabled
     if (opts.loadEnv) {
-      const envVars = loadEnvFile(process.cwd());
+      // If config specifies env files, use those, otherwise use default .env
+      const envFiles = lambdaRunningConfig && lambdaRunningConfig.envFiles ? lambdaRunningConfig.envFiles : ['.env'];
+      let envVars = {};
+      
+      // Load each env file in order
+      for (const envFile of envFiles) {
+        const vars = loadEnvFile(process.cwd(), envFile);
+        envVars = { ...envVars, ...vars };
+      }
 
       // Apply environment variables
       for (const [key, value] of Object.entries(envVars)) {
@@ -275,63 +333,14 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
       ...context,
     };
 
-    // Execute the handler inside a try-catch to capture errors
-    let result;
-    const startTime = Date.now(); // Define startTime before execution
-    try {
-      result = await handler[handlerMethod](event, defaultContext);
-    } catch (handlerError) {
-      // For exceptions that occur during handler execution,
-      // we need to ensure we capture the exact name of the exception
-      
-      if (handlerError instanceof Error) {
-        // Capture the exact name of the error class
-        // We log in a special way to preserve the class name
-        console.log(`${handlerError.constructor.name || handlerError.name || 'Error'} [Error]`);
-        
-        // Log the stack trace if it exists, or the error message if there's no stack
-        if (handlerError.stack) {
-          console.log(handlerError.stack.split('\n').slice(1).join('\n'));
-        } else if (handlerError.message) {
-          console.log(handlerError.message);
-        }
-        
-        // Additional details only in system logs
-        global.systemLog(`Error intercepted: ${handlerError.constructor.name || handlerError.name}: ${handlerError.message}`);
-        
-        // If the error has additional properties, show them only in system logs
-        const errorProps = {};
-        for (const key in handlerError) {
-          if (key !== 'name' && key !== 'message' && key !== 'stack' && typeof handlerError[key] !== 'function') {
-            errorProps[key] = handlerError[key];
-          }
-        }
-        
-        if (Object.keys(errorProps).length > 0) {
-          global.systemLog('Error additional details:', errorProps);
-        }
-      } else {
-        // If it's not an Error, log it as is
-        console.log(handlerError);
-      }
-      
-      // Re-throw the error so it can be handled appropriately
-      throw handlerError;
-    }
-    
-    const endTime = Date.now();
-    const duration = endTime - startTime;
-    
-    global.systemLog(`Handler returned result: ${JSON.stringify(result, null, 2)}`);
-    global.systemLog(`Execution completed in ${duration}ms`);
-    return result;
+    // Execute the handler
+    return await handler[handlerMethod](event, defaultContext);
   } catch (error) {
-    // Also use systemLog for error messages so they don't appear in the Output
-    global.systemLog(`Error: ${error.message}`);
-    global.systemLog(`Error details: ${error.stack}`);
-    
-    // Make sure the error is propagated to be handled by whoever called this function
+    console.error('Error executing handler:', error);
     throw error;
+  } finally {
+    // Restore the original module resolver
+    restoreOriginalResolver();
   }
 }
 
@@ -352,14 +361,52 @@ function scanForHandlers(directory, extensions = ['.js', '.ts'], options = {}) {
     ...options,
   };
 
+  // Load configuration if not already loaded
+  if (!lambdaRunningConfig) {
+    lambdaRunningConfig = loadConfig(directory);
+    if (lambdaRunningConfig.debug) {
+      global.systemLog('Lambda Running configuration loaded for handler scanning');
+    }
+  }
+
   // Get ignore patterns
   let ignorePatterns = [];
   if (opts.ignoreNodeModules) {
-    ignorePatterns.push('node_modules');
+    ignorePatterns.push('node_modules/**');
   }
-
   if (opts.useIgnoreFile) {
-    ignorePatterns = readIgnoreFile(directory);
+    const ignoreFilePatterns = readIgnoreFile(directory);
+    ignorePatterns = [...ignorePatterns, ...ignoreFilePatterns];
+  }
+  
+  // Add any additional ignore patterns from configuration
+  if (lambdaRunningConfig && lambdaRunningConfig.ignorePatterns && 
+      Array.isArray(lambdaRunningConfig.ignorePatterns)) {
+    ignorePatterns = [...ignorePatterns, ...lambdaRunningConfig.ignorePatterns];
+  }
+  
+  // If ignoreLayerFilesOnScan is enabled, ignore files in layers directory
+  if (lambdaRunningConfig && lambdaRunningConfig.ignoreLayerFilesOnScan) {
+    const layersDir = path.join(directory, 'layers/**');
+    if (lambdaRunningConfig.debug) {
+      global.systemLog(`Ignoring layer files during scan: ${layersDir}`);
+    }
+    ignorePatterns.push(layersDir);
+    
+    // Also ignore layer paths from layerMappings
+    if (lambdaRunningConfig.layerMappings) {
+      Object.values(lambdaRunningConfig.layerMappings).forEach(localPath => {
+        // If path is relative, make it absolute
+        const absolutePath = path.isAbsolute(localPath) 
+          ? localPath 
+          : path.join(directory, localPath);
+        
+        if (lambdaRunningConfig.debug) {
+          global.systemLog(`Ignoring layer mapping path during scan: ${absolutePath}`);
+        }
+        ignorePatterns.push(absolutePath + '/**');
+      });
+    }
   }
 
   return scanDirectory(directory, extensions, ignorePatterns);
@@ -380,6 +427,11 @@ function scanDirectory(directory, extensions, ignorePatterns) {
 
       // Skip files/directories that match ignore patterns
       if (shouldIgnore(filePath, ignorePatterns)) {
+        if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+          global.systemLog ? 
+            global.systemLog(`Ignoring file due to pattern match: ${filePath}`) : 
+            console.log(`Ignoring file due to pattern match: ${filePath}`);
+        }
         continue;
       }
 
@@ -402,8 +454,16 @@ function scanDirectory(directory, extensions, ignorePatterns) {
               continue;
             }
 
+            // Activate layer resolver temporarily to handle imports from layers
+            if (lambdaRunningConfig) {
+              initializeLayerResolver(lambdaRunningConfig);
+            }
+
             // Try to require the file to see if it's a module
             const handler = require(filePath);
+
+            // Restore original resolver right after require
+            restoreOriginalResolver();
 
             // Only get methods named 'handler'
             const methods = Object.keys(handler).filter(
@@ -411,16 +471,51 @@ function scanDirectory(directory, extensions, ignorePatterns) {
             );
 
             if (methods.length > 0) {
+              // This is a valid handler file
+              if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+                global.systemLog ? 
+                  global.systemLog(`Found handler: ${filePath} with methods: ${methods.join(', ')}`) : 
+                  console.log(`Found handler: ${filePath} with methods: ${methods.join(', ')}`);
+              }
+              
               results.push({
                 path: filePath,
                 methods,
               });
             }
           } catch (error) {
-            // Skip files that can't be required
-            global.systemLog ? 
-              global.systemLog(`Could not load potential handler: ${filePath} - ${error.message}`) : 
-              console.warn(`Could not load potential handler: ${filePath}`, error.message);
+            // Make sure to restore the resolver in case of errors
+            restoreOriginalResolver();
+            
+            // If it contains code that suggests it's a handler but failed due to layers
+            const isHandlerWithLayerImport = 
+              (error.message && error.message.includes('Cannot find module \'/opt/nodejs/')) && 
+              // Check if the file is not inside a 'layers' directory but is trying to use layers
+              !filePath.includes(path.sep + 'layers' + path.sep) &&
+              // Has 'exports.handler' or 'module.exports.handler' in its content
+              fs.readFileSync(filePath, 'utf8').match(/(?:exports|module\.exports)\.handler\s*=/);
+            
+            if (isHandlerWithLayerImport) {
+              // This is likely a handler that uses layers
+              global.systemLog ? 
+                global.systemLog(`Found handler with layer imports: ${filePath} (will be available at runtime)`) : 
+                console.log(`Found handler with layer imports: ${filePath} (will be available at runtime)`);
+              
+              results.push({
+                path: filePath,
+                methods: ['handler'],
+              });
+            } else if (error.message && error.message.includes('Cannot find module \'/opt/nodejs/')) {
+              // This is likely a layer file that imports from other layers
+              global.systemLog ? 
+                global.systemLog(`Skipping layer file (imports from other layers): ${filePath}`) : 
+                console.warn(`Skipping layer file (imports from other layers): ${filePath}`);
+            } else {
+              // Log other errors
+              global.systemLog ? 
+                global.systemLog(`Could not load potential handler: ${filePath} - ${error.message}`) : 
+                console.warn(`Could not load potential handler: ${filePath}`, error.message);
+            }
           }
         }
       }

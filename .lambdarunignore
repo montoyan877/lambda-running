@@ -5,3 +5,5 @@ bin
 ui
 releases
 src
+tests
+coverage
