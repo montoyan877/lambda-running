@@ -45,6 +45,13 @@ export default defineComponent({
     let monaco = null;
     let subscription = null;
     
+    // Format the code in the editor
+    const format = () => {
+      if (editor && monaco) {
+        editor.getAction('editor.action.formatDocument').run();
+      }
+    };
+    
     // Load Monaco from CDN
     const loadMonacoFromCDN = () => {
       return new Promise((resolve, reject) => {
@@ -135,6 +142,14 @@ export default defineComponent({
           ...props.options,
         });
         
+        // Add keyboard shortcut for format (SHIFT+ALT+F)
+        editor.addCommand(
+          monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
+          function() {
+            format();
+          }
+        );
+        
         // Set up content change listener
         subscription = editor.onDidChangeModelContent(() => {
           const value = editor.getValue();
@@ -187,7 +202,8 @@ export default defineComponent({
     
     return {
       editorContainer,
-      loading
+      loading,
+      format
     };
   },
 });
