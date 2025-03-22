@@ -11,6 +11,55 @@
         </div>
         
         <div class="flex space-x-3">
+          <div class="relative">
+            <button 
+              class="btn btn-outline text-sm flex items-center"
+              @click="togglePanelMenu"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span>Output Panels</span>
+            </button>
+            
+            <div v-if="showPanelMenu" class="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-dark-200 ring-1 ring-black ring-opacity-5 z-30">
+              <div class="py-1" role="menu" aria-orientation="vertical">
+                <div class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-dark-border">
+                  <p class="font-medium">Show/Hide Output Panels</p>
+                </div>
+                
+                <div @click.stop class="px-4 py-2 hover:bg-gray-100 dark:hover:bg-dark-hover">
+                  <label class="flex items-center text-sm text-gray-700 dark:text-gray-300">
+                    <svg v-if="showOutputPanel" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                    <input type="checkbox" v-model="showOutputPanel" class="mr-2 hidden" />
+                    <span>Output</span>
+                  </label>
+                </div>
+                
+                <div @click.stop class="px-4 py-2 hover:bg-gray-100 dark:hover:bg-dark-hover">
+                  <label class="flex items-center text-sm text-gray-700 dark:text-gray-300">
+                    <svg v-if="showResultPanel" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                    <input type="checkbox" v-model="showResultPanel" class="mr-2 hidden" />
+                    <span>Result</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           <button 
             v-if="!isExecuting"
             class="btn btn-primary text-sm flex items-center"
@@ -31,14 +80,6 @@
             </svg>
             <span>Stop Execution</span>
           </button>
-          
-          <button 
-            class="btn btn-outline text-sm"
-            @click="showSaveEventModal = true"
-            :disabled="!eventData || isExecuting"
-          >
-            Save Event
-          </button>
         </div>
       </div>
     </header>
@@ -57,6 +98,17 @@
             </div>
             
             <div class="flex space-x-2 items-center">
+              <button
+                class="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors"
+                @click="showSaveEventModal = true"
+                :disabled="!eventData || isExecuting"
+                title="Save Event"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                </svg>
+              </button>
+              
               <AWSEventTemplateSelector @select-template="applyAWSTemplate" />
               
               <button 
@@ -134,8 +186,8 @@
       
       <template #right>
         <!-- Results Panel -->
-        <div class="h-full flex flex-col">
-          <div class="p-3 border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-100 flex justify-between items-center">
+        <div v-if="showOutputPanel || showResultPanel" class="h-full flex flex-col">
+          <div v-if="showOutputPanel" class="p-3 border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-100 flex justify-between items-center">
             <h2 class="font-medium">Output</h2>
             
             <div class="flex space-x-2">
@@ -148,7 +200,11 @@
             </div>
           </div>
           
-          <ResizablePanelVertical class="flex-1" :initialSplit="60">
+          <ResizablePanelVertical 
+            v-if="showOutputPanel && showResultPanel" 
+            class="flex-1" 
+            :initialSplit="60"
+          >
             <template #top>
               <!-- Terminal Output -->
               <div class="h-full overflow-hidden">
@@ -209,6 +265,87 @@
               </div>
             </template>
           </ResizablePanelVertical>
+          
+          <!-- Show only Output panel when Result panel is hidden -->
+          <div v-else-if="showOutputPanel && !showResultPanel" class="flex-1 overflow-hidden">
+            <Terminal 
+              ref="terminal"
+              :logs="currentLogs"
+            />
+          </div>
+          
+          <!-- Show only Result panel when Output panel is hidden -->
+          <div v-else-if="!showOutputPanel && showResultPanel" class="flex-1 overflow-hidden flex flex-col">
+            <div class="p-3 border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-100 flex justify-between items-center">
+              <h3 class="font-medium">Result</h3>
+              
+              <div class="flex items-center space-x-3">
+                <div v-if="currentResult" class="flex items-center space-x-3">
+                  <div class="flex items-center text-xs">
+                    <label class="flex items-center cursor-pointer">
+                      <span class="mr-2 text-gray-700 dark:text-gray-300">Pretty JSON View</span>
+                      <div class="relative">
+                        <input type="checkbox" v-model="forceJsonFormat" class="sr-only" />
+                        <div class="w-10 h-5 rounded-full shadow-inner transition-colors duration-300"
+                             :class="forceJsonFormat ? 'bg-primary-500 dark:bg-primary-600' : 'bg-gray-300 dark:bg-slate-500'"></div>
+                        <div class="dot absolute left-0.5 top-0.5 w-4 h-4 bg-white dark:bg-gray-200 rounded-full shadow transition-transform duration-300 ease-in-out" 
+                            :class="{ 'transform translate-x-5': forceJsonFormat }"></div>
+                      </div>
+                    </label>
+                  </div>
+                  <div class="text-xs">
+                    <span 
+                      :class="currentResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
+                    >
+                      {{ currentResult.success ? 'Success' : 'Failed' }}
+                    </span>
+                    <span class="text-gray-500 dark:text-gray-400 ml-2">
+                      {{ formatDuration(currentResult.duration) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="flex-1 overflow-hidden">
+              <CodeEditor
+                v-if="currentResult"
+                :modelValue="formatResultOutput(currentResult)"
+                language="json"
+                :theme="isDarkMode ? 'vs-dark' : 'vs'"
+                :key="`result-editor-${isDarkMode}`"
+                :readOnly="true"
+              />
+              <div v-else class="p-4 text-center text-gray-500 dark:text-gray-400 h-full flex items-center justify-center">
+                <p>Run handler to see results</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div v-else class="h-full flex items-center justify-center bg-gray-100 dark:bg-dark-200">
+          <div class="flex flex-col gap-3 items-center">
+            <button 
+              class="px-4 py-2 rounded bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors flex items-center gap-2 text-gray-700 dark:text-gray-300"
+              @click="showOutputPanel = true"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              Show Output
+            </button>
+            
+            <button 
+              class="px-4 py-2 rounded bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors flex items-center gap-2 text-gray-700 dark:text-gray-300"
+              @click="showResultPanel = true"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              Show Result
+            </button>
+          </div>
         </div>
       </template>
     </ResizablePanel>
@@ -274,6 +411,9 @@ export default defineComponent({
     const selectedEventLabel = ref(null);
     const forceJsonFormat = ref(false);
     const resultViewMode = computed(() => forceJsonFormat.value ? 'json' : 'string');
+    const showPanelMenu = ref(false);
+    const showOutputPanel = ref(true);
+    const showResultPanel = ref(true);
     
     // On mount, initialize
     onMounted(() => {
@@ -309,6 +449,8 @@ export default defineComponent({
       
       // Add global event listener for Ctrl+Enter
       window.addEventListener('keydown', handleKeydown);
+      // Add click listener to close panel menu when clicking outside
+      window.addEventListener('click', closePanelMenu);
 
       // Watch for theme changes
       const observer = new MutationObserver((mutations) => {
@@ -327,9 +469,10 @@ export default defineComponent({
       });
     });
     
-    // Remove event listener on unmount
+    // Remove event listeners on unmount
     onBeforeUnmount(() => {
       window.removeEventListener('keydown', handleKeydown);
+      window.removeEventListener('click', closePanelMenu);
     });
     
     // Handle keydown events
@@ -723,6 +866,15 @@ export default defineComponent({
       showSavedEvents.value = false;
     };
     
+    const togglePanelMenu = (event) => {
+      event.stopPropagation();
+      showPanelMenu.value = !showPanelMenu.value;
+    };
+    
+    const closePanelMenu = () => {
+      showPanelMenu.value = false;
+    };
+    
     return {
       // Refs
       eventEditor,
@@ -738,6 +890,9 @@ export default defineComponent({
       // UI State
       sidebarCollapsed,
       isDarkMode,
+      showPanelMenu,
+      showOutputPanel,
+      showResultPanel,
       
       // Computed
       currentHandler,
@@ -758,7 +913,9 @@ export default defineComponent({
       formatDuration,
       formatResultOutput,
       getRelativePath,
-      applyAWSTemplate
+      applyAWSTemplate,
+      togglePanelMenu,
+      closePanelMenu
     };
   }
 });
@@ -773,5 +930,25 @@ export default defineComponent({
 .relative {
   position: relative;
   z-index: 20;
+}
+
+/* Panel menu dropdown styles */
+.absolute {
+  @apply transition-opacity duration-150;
+}
+
+/* Eye button styles */
+.dot {
+  @apply transition-transform duration-200 ease-in-out;
+}
+
+/* Add smooth transitions to panel visibility changes */
+.h-full {
+  @apply transition-all duration-200 ease-in-out;
+}
+
+/* Disabled button styles */
+button:disabled {
+  @apply opacity-50 cursor-not-allowed;
 }
 </style> 
