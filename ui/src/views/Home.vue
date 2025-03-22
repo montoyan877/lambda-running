@@ -170,7 +170,7 @@ export default defineComponent({
       if (!handler) return ''
       
       const pathParts = handler.path.split('/')
-      return `${pathParts[pathParts.length - 1]} -> ${handler.method}`
+      return `${pathParts[pathParts.length - 1]}`
     }
     
     const goToHandler = (handler) => {

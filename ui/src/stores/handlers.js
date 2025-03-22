@@ -36,8 +36,8 @@ export const useHandlersStore = defineStore('handlers', {
         }
         
         handler.methods.forEach(method => {
-          // Create a more user-friendly display name
-          const displayName = `${fileName} -> ${method}`
+          // Create a more user-friendly display name - show just the file name without the method
+          const displayName = `${fileName}`
           
           // Create a more user-friendly relative path for display
           const relativePath = parts.length > 2 
@@ -187,7 +187,7 @@ export const useHandlersStore = defineStore('handlers', {
       
       if (sessionId) {
         // Successfully started execution
-        notify.success(`Running handler: ${handler.relativePath || this.getRelativePath(handler.path)} -> ${handler.method}`)
+        notify.success(`Running handler: ${handler.relativePath || this.getRelativePath(handler.path)}`)
       }
     },
     

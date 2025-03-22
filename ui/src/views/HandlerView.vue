@@ -6,7 +6,7 @@
         <div :class="{ 'pl-6': sidebarCollapsed }">
           <h1 class="text-xl font-bold">Handler Testing</h1>
           <p v-if="currentHandler" class="text-sm text-gray-400 mt-1">
-            {{ currentHandler.relativePath || getRelativePath(currentHandler.path) }} -> {{ currentHandler.method }}
+            {{ currentHandler.relativePath || getRelativePath(currentHandler.path) }}
           </p>
         </div>
         

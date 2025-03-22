@@ -544,7 +544,7 @@ async function runInteractiveMode() {
       // Display the selected handler for clarity
       console.log(
         chalk.cyan(
-          `\nSelected handler: ${path.relative(process.cwd(), handler.path)} -> ${handler.method}`
+          `\nSelected handler: ${path.relative(process.cwd(), handler.path)}`
         )
       );
 
