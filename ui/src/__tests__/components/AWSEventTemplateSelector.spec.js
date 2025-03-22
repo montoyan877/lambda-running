@@ -45,7 +45,11 @@ describe('AWSEventTemplateSelector Component', () => {
   let wrapper;
   
   beforeEach(() => {
-    wrapper = mount(AWSEventTemplateSelector);
+    wrapper = mount(AWSEventTemplateSelector, {
+      props: {
+        activeDropdown: null
+      }
+    });
   });
   
   it('renders correctly with button and initially closed dropdown', () => {
@@ -54,58 +58,84 @@ describe('AWSEventTemplateSelector Component', () => {
     expect(wrapper.text()).toContain('AWS Templates');
     
     // Dropdown should be initially closed
-    expect(wrapper.find('.absolute').exists()).toBe(false);
+    expect(wrapper.find('.fixed').exists()).toBe(false);
   });
   
   it('opens dropdown when button is clicked', async () => {
-    // Click the button
+    // Setup a new wrapper with default props
+    wrapper = mount(AWSEventTemplateSelector, {
+      props: {
+        activeDropdown: null
+      }
+    });
+    
+    // Click the button to emit the dropdown-opened event
     await wrapper.find('button').trigger('click');
     
+    // Verify the event was emitted
+    expect(wrapper.emitted('dropdown-opened')).toBeTruthy();
+    expect(wrapper.emitted('dropdown-opened')[0][0]).toBe('aws-templates');
+    
+    // Now simulate the parent setting activeDropdown
+    await wrapper.setProps({ activeDropdown: 'aws-templates' });
+    
     // Dropdown should now be visible
-    expect(wrapper.find('.absolute').exists()).toBe(true);
+    expect(wrapper.find('.fixed').exists()).toBe(true);
     
     // Should show all templates
-    const templateButtons = wrapper.findAll('.absolute button');
+    const templateButtons = wrapper.findAll('.fixed button');
     expect(templateButtons.length).toBe(AWS_EVENT_TEMPLATES.length);
   });
   
   it('filters templates based on search query', async () => {
-    // Open dropdown
-    await wrapper.find('button').trigger('click');
+    // Set activeDropdown to simulate open state
+    wrapper = mount(AWSEventTemplateSelector, {
+      props: {
+        activeDropdown: 'aws-templates'
+      }
+    });
     
     // Enter search query
     const searchInput = wrapper.find('input');
     await searchInput.setValue('S3');
     
     // Should show only matching templates
-    const templateButtons = wrapper.findAll('.absolute button');
+    const templateButtons = wrapper.findAll('.fixed button');
     expect(templateButtons.length).toBe(1);
     expect(templateButtons[0].text()).toContain('S3 Put');
   });
   
   it('shows confirmation modal when template is selected', async () => {
-    // Open dropdown
-    await wrapper.find('button').trigger('click');
+    // Set activeDropdown to simulate open state
+    wrapper = mount(AWSEventTemplateSelector, {
+      props: {
+        activeDropdown: 'aws-templates'
+      }
+    });
     
     // Select a template
-    const templateButtons = wrapper.findAll('.absolute button');
+    const templateButtons = wrapper.findAll('.fixed button');
     await templateButtons[0].trigger('click');
     
     // Confirmation modal should be visible
-    expect(wrapper.find('.fixed').exists()).toBe(true);
+    expect(wrapper.find('.fixed.inset-0').exists()).toBe(true);
     expect(wrapper.text()).toContain('Replace Event Data?');
   });
   
   it('emits select-template event when confirmed', async () => {
-    // Open dropdown
-    await wrapper.find('button').trigger('click');
+    // Set activeDropdown to simulate open state
+    wrapper = mount(AWSEventTemplateSelector, {
+      props: {
+        activeDropdown: 'aws-templates'
+      }
+    });
     
     // Select a template
-    const templateButtons = wrapper.findAll('.absolute button');
+    const templateButtons = wrapper.findAll('.fixed button');
     await templateButtons[0].trigger('click');
     
-    // Click confirm button
-    const confirmButton = wrapper.findAll('.fixed button')[1];
+    // Click confirm button (in the modal)
+    const confirmButton = wrapper.find('.bg-blue-600');
     await confirmButton.trigger('click');
     
     // Check event was emitted with correct template
