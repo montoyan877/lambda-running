@@ -451,7 +451,7 @@ export default defineComponent({
     
     // Handle keydown events
     const handleKeydown = (event) => {
-      // Check if it's Ctrl+Enter
+      // Check if it's Ctrl+Enter or Cmd+Enter (for macOS)
       if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
         // Prevent default behavior (like form submission)
         event.preventDefault();
@@ -460,6 +460,15 @@ export default defineComponent({
         if (currentHandler.value && !isExecuting.value && eventData.value) {
           runHandler();
         }
+      }
+      
+      // Format shortcut - normalize the key case for consistency
+      const key = event.key.toUpperCase();
+      if ((event.altKey && event.shiftKey && key === 'F') || 
+          ((event.ctrlKey || event.metaKey) && event.shiftKey && key === 'F') ||
+          (event.metaKey && event.altKey && key === 'F')) {
+        event.preventDefault();
+        formatEvent();
       }
     };
     
@@ -698,7 +707,24 @@ export default defineComponent({
     
     const formatEvent = () => {
       if (eventEditor.value) {
-        eventEditor.value.format();
+        try {
+          // First attempt: Try using direct JSON formatting
+          const jsonData = JSON.parse(eventData.value);
+          eventData.value = JSON.stringify(jsonData, null, 2);
+          
+          // If editor has a format method, also try it for better formatting
+          if (typeof eventEditor.value.format === 'function') {
+            try {
+              eventEditor.value.format();
+            } catch (editorError) {
+              // Silent catch - we already formatted with JSON.stringify
+            }
+          }
+          
+          notify.success('JSON formatted successfully');
+        } catch (error) {
+          notify.error(`Invalid JSON: ${error.message}`);
+        }
       }
     };
     
