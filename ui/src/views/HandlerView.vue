@@ -49,7 +49,12 @@
         <!-- Event Editor -->
         <div class="h-full flex flex-col">
           <div class="p-3 border-b border-dark-border bg-dark-100 flex justify-between items-center">
-            <h2 class="font-medium">Event Data</h2>
+            <div class="flex items-center gap-2">
+              <h2 class="font-medium">Event Data</h2>
+              <span v-if="selectedEventLabel" class="text-xs px-2 py-0.5 rounded-full bg-dark-300 text-gray-300">
+                {{ selectedEventLabel }}
+              </span>
+            </div>
             
             <div class="flex space-x-2 items-center">
               <AWSEventTemplateSelector @select-template="applyAWSTemplate" />
@@ -213,6 +218,7 @@ import ResizablePanelVertical from '../components/ResizablePanelVertical.vue';
 import SaveEventModal from '../components/SaveEventModal.vue';
 import { notify } from '../components/Notification.vue';
 import AWSEventTemplateSelector from '../components/AWSEventTemplateSelector.vue';
+import { AWS_EVENT_TEMPLATES } from '../utils/awsEventTemplates';
 
 export default defineComponent({
   name: 'HandlerView',
@@ -244,6 +250,7 @@ export default defineComponent({
     const showSavedEvents = ref(false);
     const currentSessionId = ref(null);
     const showSaveEventModal = ref(false);
+    const selectedEventLabel = ref(null);
     
     // On mount, initialize
     onMounted(() => {
@@ -273,6 +280,7 @@ export default defineComponent({
         const lastEvent = handlerEventsStore.getLastEvent(handlerId);
         if (lastEvent) {
           eventData.value = JSON.stringify(lastEvent, null, 2);
+          selectedEventLabel.value = lastEvent.name;
         }
       }
       
@@ -312,12 +320,62 @@ export default defineComponent({
         const lastEvent = handlerEventsStore.getLastEvent(handlerId);
         if (lastEvent) {
           eventData.value = JSON.stringify(lastEvent, null, 2);
+          selectedEventLabel.value = null;
         } else {
           // If no last event, reset to empty object
           eventData.value = '{}';
+          selectedEventLabel.value = null;
         }
       }
     });
+    
+    // Watch for changes in the event data
+    // If the user modifies the event data, clear the selected event label
+    // Use a debounced watcher to not trigger immediately on template selection
+    let eventChangeTimeout = null;
+    watch(eventData, (newValue, oldValue) => {
+      if (newValue !== oldValue) {
+        // Clear any existing timeout
+        if (eventChangeTimeout) {
+          clearTimeout(eventChangeTimeout);
+        }
+        
+        // Set a new timeout to clear the label after a short delay
+        // This prevents the label from being cleared when we programmatically set the event data
+        eventChangeTimeout = setTimeout(() => {
+          // Only clear if the data still doesn't match a template or saved event
+          if (selectedEventLabel.value) {
+            // Try to determine if this is a user edit or a programmatic change
+            try {
+              const currentEventData = JSON.parse(newValue);
+              
+              // Check if we're still showing a template
+              if (selectedEventLabel.value.includes('API Gateway') || 
+                  selectedEventLabel.value.includes('S3') ||
+                  selectedEventLabel.value.includes('DynamoDB') ||
+                  selectedEventLabel.value.includes('CloudFront') ||
+                  selectedEventLabel.value.includes('SNS') ||
+                  selectedEventLabel.value.includes('SQS') ||
+                  selectedEventLabel.value.includes('EventBridge')) {
+                
+                // Find the template
+                const template = AWS_EVENT_TEMPLATES.find(t => t.name === selectedEventLabel.value);
+                if (template && JSON.stringify(template.data) !== JSON.stringify(currentEventData)) {
+                  selectedEventLabel.value = null;
+                }
+              } else {
+                // For saved events, we don't have an easy way to compare, so just clear the label
+                // after user edits (this timeout provides a slight buffer)
+                selectedEventLabel.value = null;
+              }
+            } catch (e) {
+              // Invalid JSON, just clear the label
+              selectedEventLabel.value = null;
+            }
+          }
+        }, 500); // 500ms delay
+      }
+    }, { deep: true });
     
     // Computed
     const currentHandler = computed(() => handlersStore.activeHandler);
@@ -480,6 +538,7 @@ export default defineComponent({
     
     const selectEvent = (event) => {
       eventData.value = JSON.stringify(event.data, null, 2);
+      selectedEventLabel.value = event.name;
       showSavedEvents.value = false;
     };
     
@@ -566,6 +625,7 @@ export default defineComponent({
     
     const applyAWSTemplate = (template) => {
       eventData.value = JSON.stringify(template.data, null, 2);
+      selectedEventLabel.value = template.name;
       showSavedEvents.value = false;
     };
     
@@ -577,6 +637,7 @@ export default defineComponent({
       showSavedEvents,
       currentSessionId,
       showSaveEventModal,
+      selectedEventLabel,
       
       // UI State
       sidebarCollapsed,
