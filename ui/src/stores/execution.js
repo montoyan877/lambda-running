@@ -251,6 +251,11 @@ export const useExecutionStore = defineStore('execution', {
       
       // Also indicate that execution has finished
       this.isExecuting = false;
+    },
+    
+    clearCurrentSession() {
+      // Reset the current session ID and clear any active results
+      this.currentSessionId = null;
     }
   }
 }) 

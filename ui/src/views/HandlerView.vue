@@ -331,6 +331,16 @@ export default defineComponent({
     // Watch for route changes
     watch(() => [route.params.handlerPath, route.params.handlerMethod], ([newPath, newMethod]) => {
       if (newPath && newMethod) {
+        // Clear the current execution results and logs
+        currentSessionId.value = null;
+        executionStore.clearCurrentSession();
+        
+        // Also clear terminal logs if the terminal component is available
+        if (terminal.value && terminal.value.clear) {
+          terminal.value.clear();
+        }
+        
+        // Set the new active handler
         handlersStore.setActiveHandler(
           decodeURIComponent(newPath),
           newMethod
