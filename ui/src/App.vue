@@ -28,8 +28,33 @@
       <!-- Navigation -->
       <nav class="flex-1 overflow-y-auto p-2">
         <div class="mb-2">
-          <div class="px-3 mb-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
-            Handlers
+          <div class="px-3 mb-2 text-xs font-bold text-gray-500 uppercase tracking-wider flex justify-between items-center">
+            <span>Handlers</span>
+            <span class="text-xs text-primary-500">{{ filteredHandlerCount || totalHandlerCount }}</span>
+          </div>
+          
+          <!-- Search input -->
+          <div class="px-2 mb-3">
+            <div class="relative">
+              <input 
+                v-model="searchTerm" 
+                type="text" 
+                placeholder="Search handlers..." 
+                class="w-full bg-dark-200 border border-dark-border rounded p-2 pl-8 text-xs focus:outline-none focus:ring-1 focus:ring-primary-500"
+              />
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-2 top-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <button 
+                v-if="searchTerm" 
+                @click="searchTerm = ''" 
+                class="absolute right-2 top-2 text-gray-400 hover:text-gray-300"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
           
           <div v-if="isLoadingHandlers" class="px-3 py-2 text-sm text-gray-400">
@@ -49,57 +74,82 @@
           </template>
           
           <template v-else>
-            <div v-for="(handlers, directory) in groupedHandlers" :key="directory" class="mb-3">
-              <div class="px-3 py-1 text-xs font-medium text-gray-400">
-                {{ directory }}
+            <div v-for="(handlers, directory) in filteredGroupedHandlers" :key="directory" class="mb-3">
+              <!-- Directory header (clickable) -->
+              <div 
+                @click="toggleDirectory(directory)"
+                class="px-3 py-1.5 text-xs font-medium text-gray-400 hover:bg-dark-hover rounded cursor-pointer flex items-center"
+              >
+                <div class="flex items-center">
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    class="h-3.5 w-3.5 mr-1.5 transition-transform duration-200" 
+                    :class="{'transform rotate-90': isDirectoryExpanded(directory)}"
+                    fill="none" 
+                    viewBox="0 0 24 24" 
+                    stroke="currentColor"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                  <span>{{ directory }}</span>
+                </div>
               </div>
               
-              <div 
-                v-for="handler in handlers" 
-                :key="`${handler.path}-${handler.method}`"
-                class="relative group"
-              >
-                <router-link 
-                  :to="`/handlers/${encodeURIComponent(handler.path)}/${handler.method}`"
-                  class="sidebar-item text-xs pl-5"
-                  :class="{ 'pointer-events-none opacity-50': isExecuting }"
-                  active-class="active"
+              <!-- Handlers list (collapsible) -->
+              <div v-if="isDirectoryExpanded(directory)" class="mt-1">
+                <div 
+                  v-for="handler in handlers" 
+                  :key="`${handler.path}-${handler.method}`"
+                  class="relative group"
                 >
-                  {{ handler.name }}
-                </router-link>
-                
-                <!-- Play button on hover -->
-                <button 
-                  class="absolute right-2 top-1/2 transform -translate-y-1/2 text-green-500 transition-opacity"
-                  :class="{ 'opacity-0 group-hover:opacity-100': !isHandlerExecuting(handler), 'opacity-100': isHandlerExecuting(handler) }"
-                  @click="runHandlerFromSidebar(handler)"
-                  title="Run this handler"
-                  :disabled="isExecuting"
-                >
-                  <!-- Loading spinner while executing -->
-                  <svg v-if="isHandlerExecuting(handler)" class="animate-spin h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                  <router-link 
+                    :to="`/handlers/${encodeURIComponent(handler.path)}/${handler.method}`"
+                    class="sidebar-item text-xs pl-6 py-1.5 flex items-center"
+                    :class="{ 'pointer-events-none opacity-50': isExecuting }"
+                    active-class="active"
+                  >
+                    <span v-if="searchTerm" v-html="highlightMatch(handler.name)"></span>
+                    <span v-else>{{ handler.name }}</span>
+                    <span v-if="handler.method !== 'handler'" class="ml-1 text-xs text-gray-500">
+                      ({{ handler.method }})
+                    </span>
+                  </router-link>
                   
-                  <!-- Play icon when not executing -->
-                  <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hover:text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
-                  </svg>
-                </button>
+                  <!-- Play button on hover -->
+                  <button 
+                    class="absolute right-2 top-1/2 transform -translate-y-1/2 text-green-500 transition-opacity"
+                    :class="{ 'opacity-0 group-hover:opacity-100': !isHandlerExecuting(handler), 'opacity-100': isHandlerExecuting(handler) }"
+                    @click="runHandlerFromSidebar(handler)"
+                    title="Run this handler"
+                    :disabled="isExecuting"
+                  >
+                    <!-- Loading spinner while executing -->
+                    <svg v-if="isHandlerExecuting(handler)" class="animate-spin h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    
+                    <!-- Play icon when not executing -->
+                    <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hover:text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
               </div>
+            </div>
+            
+            <!-- No results message -->
+            <div v-if="Object.keys(filteredGroupedHandlers).length === 0" class="px-3 py-2 text-sm text-gray-400">
+              No handlers matching "{{ searchTerm }}"
             </div>
           </template>
         </div>
       </nav>
       
-      <!-- Footer with handler count -->
+      <!-- Footer with version -->
       <div class="p-3 border-t border-dark-border">
-        <div class="text-xs text-gray-500 flex justify-between items-center">
+        <div class="text-xs text-gray-500">
           <span>Lambda Running v{{ version }}</span>
-          <span v-if="totalHandlerCount > 0" class="px-2 py-1 bg-dark-200 rounded-md text-primary-500 text-xs font-medium">
-            {{ totalHandlerCount }} Handlers
-          </span>
         </div>
       </div>
     </aside>
@@ -163,6 +213,8 @@ export default defineComponent({
     const isInitializing = ref(true)
     const hasCompletedInitialLoad = ref(false)
     const sidebarCollapsed = ref(false)
+    const searchTerm = ref('')
+    const expandedDirectories = ref({})
     
     // Provide sidebarCollapsed to all child components
     provide('sidebarCollapsed', sidebarCollapsed)
@@ -174,13 +226,74 @@ export default defineComponent({
       localStorage.setItem('sidebarCollapsed', sidebarCollapsed.value)
     }
     
+    // Toggle directory expansion
+    const toggleDirectory = (directory) => {
+      if (expandedDirectories.value[directory]) {
+        expandedDirectories.value[directory] = !expandedDirectories.value[directory]
+      } else {
+        expandedDirectories.value[directory] = true
+      }
+      // Save to localStorage
+      localStorage.setItem('expandedDirectories', JSON.stringify(expandedDirectories.value))
+    }
+    
+    // Check if directory is expanded
+    const isDirectoryExpanded = (directory) => {
+      return expandedDirectories.value[directory] !== false
+    }
+    
+    // Filter handlers based on search term
+    const filteredGroupedHandlers = computed(() => {
+      const grouped = {}
+      const groupedHandlers = handlersStore.groupedHandlers
+      
+      if (!searchTerm.value) {
+        return groupedHandlers
+      }
+      
+      const searchLower = searchTerm.value.toLowerCase()
+      
+      // Filter each directory group
+      Object.keys(groupedHandlers).forEach(dir => {
+        const matchingHandlers = groupedHandlers[dir].filter(handler => 
+          handler.name.toLowerCase().includes(searchLower) ||
+          handler.method.toLowerCase().includes(searchLower) ||
+          dir.toLowerCase().includes(searchLower)
+        )
+        
+        if (matchingHandlers.length > 0) {
+          grouped[dir] = matchingHandlers
+          // Auto-expand directories with matching handlers
+          expandedDirectories.value[dir] = true
+        }
+      })
+      
+      return grouped
+    })
+    
+    // Count total filtered handlers
+    const filteredHandlerCount = computed(() => {
+      let count = 0
+      Object.values(filteredGroupedHandlers.value).forEach(handlers => {
+        count += handlers.length
+      })
+      return count
+    })
+    
+    // Highlight matching text in search results
+    const highlightMatch = (text) => {
+      if (!searchTerm.value) return text
+      
+      const searchRegex = new RegExp(`(${searchTerm.value})`, 'gi')
+      return text.replace(searchRegex, '<span class="text-primary-500 font-medium">$1</span>')
+    }
+    
     // Run handler from sidebar
     const runHandlerFromSidebar = (handler) => {
       // Navigate to the handler
       router.push(`/handlers/${encodeURIComponent(handler.path)}/${handler.method}`)
       
       // Wait for navigation and then run the handler
-      // We'll add this functionality later in the store
       handlersStore.runHandlerFromSidebar(handler)
     }
     
@@ -195,9 +308,27 @@ export default defineComponent({
         sidebarCollapsed.value = savedSidebarState === 'true'
       }
       
+      // Restore expanded directories from localStorage
+      const savedExpandedDirectories = localStorage.getItem('expandedDirectories')
+      if (savedExpandedDirectories) {
+        try {
+          expandedDirectories.value = JSON.parse(savedExpandedDirectories)
+        } catch (e) {
+          console.error('Failed to parse saved directory state:', e)
+        }
+      }
+      
       // Fetch handlers
       try {
         await handlersStore.fetchHandlers()
+        
+        // Default expansion state for directories (if not already set)
+        const groupedHandlers = handlersStore.groupedHandlers
+        Object.keys(groupedHandlers).forEach(dir => {
+          if (expandedDirectories.value[dir] === undefined) {
+            expandedDirectories.value[dir] = true // Default to expanded
+          }
+        })
       } catch (error) {
         console.error('Failed to load handlers:', error)
       } finally {
@@ -229,11 +360,17 @@ export default defineComponent({
       isLoadingHandlers: computed(() => handlersStore.isLoading),
       handlerError: computed(() => handlersStore.error),
       groupedHandlers: computed(() => handlersStore.groupedHandlers),
+      filteredGroupedHandlers,
+      filteredHandlerCount,
+      searchTerm,
       totalHandlerCount,
       isInitializing,
       hasCompletedInitialLoad,
       sidebarCollapsed,
       toggleSidebar,
+      toggleDirectory,
+      isDirectoryExpanded,
+      highlightMatch,
       runHandlerFromSidebar,
       isExecuting: computed(() => executionStore.isExecuting),
       // Function to check if a specific handler is currently executing
@@ -254,5 +391,13 @@ export default defineComponent({
 
 .sidebar-toggle {
   transition: all 0.3s ease;
+}
+
+.sidebar-item {
+  @apply block px-3 py-1 rounded text-gray-300 hover:bg-dark-hover;
+}
+
+.sidebar-item.active {
+  @apply bg-dark-hover text-white;
 }
 </style> 
