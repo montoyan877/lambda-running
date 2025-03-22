@@ -89,48 +89,50 @@
       <template #left>
         <!-- Event Editor -->
         <div class="h-full flex flex-col">
-          <div class="p-3 border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-100 flex justify-between items-center">
-            <div class="flex items-center gap-2">
-              <h2 class="font-medium">Event Data</h2>
-              <span v-if="selectedEventLabel" class="text-xs px-2 py-0.5 rounded-full bg-gray-200 dark:bg-dark-300 text-gray-700 dark:text-gray-300 truncate max-w-[200px]" :title="selectedEventLabel">
-                {{ selectedEventLabel }}
-              </span>
-            </div>
-            
-            <div class="flex space-x-2 items-center">
-              <button
-                class="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors"
-                @click="showSaveEventModal = true"
-                :disabled="!eventData || isExecuting"
-                title="Save event"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 21V13H7v8" />
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 3v4h4" />
-                </svg>
-              </button>
+          <div class="p-3 border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-100">
+            <div class="flex flex-wrap justify-between gap-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <h2 class="font-medium whitespace-nowrap">Event Data</h2>
+                <span v-if="selectedEventLabel" class="text-xs px-2 py-0.5 rounded-full bg-gray-200 dark:bg-dark-300 text-gray-700 dark:text-gray-300 truncate max-w-[200px]" :title="selectedEventLabel">
+                  {{ selectedEventLabel }}
+                </span>
+              </div>
               
-              <SavedEventSelector 
-                :activeDropdown="activeDropdown"
-                @dropdown-opened="handleDropdownOpen" 
-                @dropdown-closed="handleDropdownClose"
-                @select-event="selectEvent" 
-              />
-              
-              <AWSEventTemplateSelector 
-                :activeDropdown="activeDropdown"
-                @dropdown-opened="handleDropdownOpen" 
-                @dropdown-closed="handleDropdownClose"
-                @select-template="applyAWSTemplate" 
-              />
-              
-              <button 
-                class="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors"
-                @click="formatEvent"
-              >
-                Format
-              </button>
+              <div class="flex flex-wrap gap-2 items-center">
+                <button
+                  class="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors"
+                  @click="showSaveEventModal = true"
+                  :disabled="!eventData || isExecuting"
+                  title="Save event"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 21V13H7v8" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 3v4h4" />
+                  </svg>
+                </button>
+                
+                <SavedEventSelector 
+                  :activeDropdown="activeDropdown"
+                  @dropdown-opened="handleDropdownOpen" 
+                  @dropdown-closed="handleDropdownClose"
+                  @select-event="selectEvent" 
+                />
+                
+                <AWSEventTemplateSelector 
+                  :activeDropdown="activeDropdown"
+                  @dropdown-opened="handleDropdownOpen" 
+                  @dropdown-closed="handleDropdownClose"
+                  @select-template="applyAWSTemplate" 
+                />
+                
+                <button 
+                  class="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors"
+                  @click="formatEvent"
+                >
+                  Format
+                </button>
+              </div>
             </div>
           </div>
           
