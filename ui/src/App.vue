@@ -106,15 +106,22 @@
                 >
                   <router-link 
                     :to="`/handlers/${encodeURIComponent(handler.path)}/${handler.method}`"
-                    class="sidebar-item text-xs pl-6 py-1.5 flex items-center"
+                    class="sidebar-item text-xs pl-8 py-1.5 flex items-center"
                     :class="{ 'pointer-events-none opacity-50': isExecuting }"
                     active-class="active"
                   >
-                    <span v-if="searchTerm" v-html="highlightMatch(handler.name)"></span>
-                    <span v-else>{{ handler.name }}</span>
-                    <span v-if="handler.method !== 'handler'" class="ml-1 text-xs text-gray-500">
-                      ({{ handler.method }})
-                    </span>
+                    <div class="flex items-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 mr-1.5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      </svg>
+                      <div>
+                        <span v-if="searchTerm" v-html="highlightMatch(handler.name)"></span>
+                        <span v-else>{{ handler.name }}</span>
+                        <span v-if="handler.method !== 'handler'" class="ml-1 text-xs text-gray-500">
+                          ({{ handler.method }})
+                        </span>
+                      </div>
+                    </div>
                   </router-link>
                   
                   <!-- Play button on hover -->
