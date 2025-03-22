@@ -165,15 +165,31 @@
                 <div class="p-3 border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-100 flex justify-between items-center">
                   <h3 class="font-medium">Result</h3>
                   
-                  <div v-if="currentResult" class="text-xs">
-                    <span 
-                      :class="currentResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
-                    >
-                      {{ currentResult.success ? 'Success' : 'Failed' }}
-                    </span>
-                    <span class="text-gray-500 dark:text-gray-400 ml-2">
-                      {{ formatDuration(currentResult.duration) }}
-                    </span>
+                  <div class="flex items-center space-x-3">
+                    <div v-if="currentResult" class="flex items-center space-x-3">
+                      <div class="flex items-center text-xs">
+                        <label class="flex items-center cursor-pointer">
+                          <span class="mr-2 text-gray-700 dark:text-gray-300">Pretty JSON View</span>
+                          <div class="relative">
+                            <input type="checkbox" v-model="forceJsonFormat" class="sr-only" />
+                            <div class="w-10 h-5 rounded-full shadow-inner transition-colors duration-300"
+                                 :class="forceJsonFormat ? 'bg-primary-500 dark:bg-primary-600' : 'bg-gray-300 dark:bg-slate-500'"></div>
+                            <div class="dot absolute left-0.5 top-0.5 w-4 h-4 bg-white dark:bg-gray-200 rounded-full shadow transition-transform duration-300 ease-in-out" 
+                                :class="{ 'transform translate-x-5': forceJsonFormat }"></div>
+                          </div>
+                        </label>
+                      </div>
+                      <div class="text-xs">
+                        <span 
+                          :class="currentResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
+                        >
+                          {{ currentResult.success ? 'Success' : 'Failed' }}
+                        </span>
+                        <span class="text-gray-500 dark:text-gray-400 ml-2">
+                          {{ formatDuration(currentResult.duration) }}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 
@@ -256,6 +272,8 @@ export default defineComponent({
     const currentSessionId = ref(null);
     const showSaveEventModal = ref(false);
     const selectedEventLabel = ref(null);
+    const forceJsonFormat = ref(false);
+    const resultViewMode = computed(() => forceJsonFormat.value ? 'json' : 'string');
     
     // On mount, initialize
     onMounted(() => {
@@ -610,22 +628,67 @@ export default defineComponent({
       try {
         if (!result) return '{}';
 
-        if (result.error) {
-          // If it's an error object, format for better visualization
-          let errorObj = result.error;
-          if (typeof errorObj === 'string') {
-            errorObj = { message: errorObj };
+        // Handle based on view mode
+        if (resultViewMode.value === 'string') {
+          // String view - show the raw string without extra escaping
+          if (result.error) {
+            // If it's an error object, format normally
+            let errorObj = result.error;
+            if (typeof errorObj === 'string') {
+              errorObj = { message: errorObj };
+            }
+            
+            // If it has details, add them
+            if (errorObj.details) {
+              errorObj.details = errorObj.details.split('\n');
+            }
+            
+            return JSON.stringify(errorObj, null, 2);
+          } else {
+            // For success, show the raw string output
+            const resultData = result.result || {};
+            
+            // If result contains a body, use it directly without transformation
+            // This ensures we show exactly what the API returns
+            return JSON.stringify(resultData, null, 2);
           }
-          
-          // If it has details, add them
-          if (errorObj.details) {
-            errorObj.details = errorObj.details.split('\n');
-          }
-          
-          return JSON.stringify(errorObj, null, 2);
         } else {
-          // If it's a successful result
-          return JSON.stringify(result.result || {}, null, 2);
+          // JSON view - parse and format as JSON
+          if (result.error) {
+            // If it's an error object, format for better visualization
+            let errorObj = result.error;
+            if (typeof errorObj === 'string') {
+              errorObj = { message: errorObj };
+            }
+            
+            // If it has details, add them
+            if (errorObj.details) {
+              errorObj.details = errorObj.details.split('\n');
+            }
+            
+            return JSON.stringify(errorObj, null, 2);
+          } else {
+            // If it's a successful result, try to parse the body if it's a string that contains JSON
+            const resultData = result.result || {};
+            
+            // If body exists and is a string that might be JSON
+            if (resultData.body && typeof resultData.body === 'string' && 
+                (resultData.body.startsWith('{') || resultData.body.startsWith('['))) {
+              try {
+                // Create a copy to avoid modifying the original
+                const formattedResult = { ...resultData };
+                // Parse the body if it's valid JSON
+                formattedResult.body = JSON.parse(resultData.body);
+                return JSON.stringify(formattedResult, null, 2);
+              } catch {
+                // If parsing fails, return as is
+                return JSON.stringify(resultData, null, 2);
+              }
+            } else {
+              // Regular JSON formatting
+              return JSON.stringify(resultData, null, 2);
+            }
+          }
         }
       } catch (e) {
         return JSON.stringify({ error: "Error formatting result" }, null, 2);
@@ -669,6 +732,8 @@ export default defineComponent({
       currentSessionId,
       showSaveEventModal,
       selectedEventLabel,
+      forceJsonFormat,
+      resultViewMode,
       
       // UI State
       sidebarCollapsed,
