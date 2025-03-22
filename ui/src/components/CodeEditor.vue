@@ -122,10 +122,10 @@ export default defineComponent({
         inherit: true,
         rules: [],
         colors: {
-          'editor.background': '#f8fafc',
+          'editor.background': '#ffffff',
           'editor.foreground': '#1e293b',
           'editorCursor.foreground': '#1e293b',
-          'editor.lineHighlightBackground': '#f1f5f9',
+          'editor.lineHighlightBackground': '#ffffff',
           'editorLineNumber.foreground': '#64748b',
           'editor.selectionBackground': '#e2e8f0',
           'editorGutter.background': '#f8fafc',

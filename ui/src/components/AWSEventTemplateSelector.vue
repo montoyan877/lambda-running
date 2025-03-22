@@ -75,7 +75,7 @@
           </button>
           <button 
             @click="confirmTemplateSelection" 
-            class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 transition-colors rounded"
+            class="px-4 py-2 text-sm bg-primary-600 hover:bg-primary-700 transition-colors rounded text-white"
           >
             Replace
           </button>
