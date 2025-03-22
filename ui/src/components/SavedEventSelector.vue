@@ -6,10 +6,10 @@
         type="button" 
         class="inline-flex items-center gap-x-1 text-xs px-2 py-1 rounded bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-orange-400" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
         </svg>
-        <span>AWS Templates</span>
+        <span>Saved Events</span>
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
         </svg>
@@ -26,35 +26,46 @@
               v-model="searchQuery"
               type="text"
               class="w-full px-2 py-1 text-sm bg-gray-100 dark:bg-dark-300 border border-gray-200 dark:border-dark-border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-              placeholder="Search templates..."
+              placeholder="Search saved events..."
             />
           </div>
           
           <div class="mt-1">
-            <template v-for="template in filteredTemplates" :key="template.name">
+            <div v-if="isLoading" class="px-3 py-2 text-sm text-center text-gray-500 dark:text-gray-400">
+              Loading events...
+            </div>
+            
+            <div v-else-if="filteredEvents.length === 0 && !searchQuery" class="px-3 py-2 text-sm text-center text-gray-500 dark:text-gray-400">
+              No saved events found
+            </div>
+            
+            <div v-else-if="filteredEvents.length === 0 && searchQuery" class="px-3 py-2 text-sm text-center text-gray-500 dark:text-gray-400">
+              No events match your search
+            </div>
+            
+            <template v-else v-for="(eventList, category) in groupedEvents" :key="category">
+              <div class="px-3 py-1 text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase bg-gray-100 dark:bg-dark-300">
+                {{ category }}
+              </div>
+              
               <button
-                @click="selectTemplate(template)"
+                v-for="event in eventList"
+                :key="event.name"
+                @click="selectEvent(event)"
                 class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-dark-hover transition-colors flex items-center gap-2"
               >
-                <!-- Template Icon -->
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" :class="template.icon?.color || 'text-orange-400'" viewBox="0 0 20 20" fill="currentColor">
-                  <path v-if="template.icon?.path" fill-rule="evenodd" :d="template.icon.path" clip-rule="evenodd" />
-                  <template v-else-if="template.icon?.paths">
-                    <path v-for="(path, index) in template.icon.paths" :key="index" :d="path" :fill-rule="index === 1 ? 'evenodd' : undefined" :clip-rule="index === 1 ? 'evenodd' : undefined" />
-                  </template>
-                  <!-- Default icon if no icon specified -->
-                  <path v-if="!template.icon?.path && !template.icon?.paths" fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 
                 <span>
-                  {{ template.name }}
+                  {{ event.name }}
+                  <div class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ formatDate(event.timestamp) }}
+                  </div>
                 </span>
               </button>
             </template>
-            
-            <div v-if="filteredTemplates.length === 0" class="px-3 py-2 text-sm text-gray-400">
-              No templates found
-            </div>
           </div>
         </div>
       </div>
@@ -65,7 +76,7 @@
       <div class="bg-white dark:bg-dark-100 rounded-lg shadow-xl max-w-md w-full p-4">
         <h3 class="text-lg font-medium mb-2">Replace Event Data?</h3>
         <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">
-          This will replace your current event data with the selected template. Are you sure you want to continue?
+          This will replace your current event data with the selected saved event. Are you sure you want to continue?
         </p>
         <div class="flex justify-end space-x-2">
           <button 
@@ -75,7 +86,7 @@
             Cancel
           </button>
           <button 
-            @click="confirmTemplateSelection" 
+            @click="confirmEventSelection" 
             class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 transition-colors rounded text-white"
           >
             Replace
@@ -88,10 +99,10 @@
 
 <script>
 import { defineComponent, ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
-import { AWS_EVENT_TEMPLATES } from '../utils/awsEventTemplates';
+import { useEventsStore } from '../stores/events';
 
 export default defineComponent({
-  name: 'AWSEventTemplateSelector',
+  name: 'SavedEventSelector',
   
   props: {
     activeDropdown: {
@@ -100,28 +111,44 @@ export default defineComponent({
     }
   },
   
-  emits: ['select-template', 'dropdown-opened', 'dropdown-closed'],
+  emits: ['select-event', 'dropdown-opened', 'dropdown-closed'],
   
   setup(props, { emit }) {
-    const DROPDOWN_NAME = 'aws-templates';
+    const DROPDOWN_NAME = 'saved-events';
+    const eventsStore = useEventsStore();
+    
     const searchQuery = ref('');
     const showConfirmModal = ref(false);
-    const selectedTemplate = ref(null);
+    const selectedEvent = ref(null);
     
     // Computed to check if this dropdown is active
     const isActive = computed(() => props.activeDropdown === DROPDOWN_NAME);
     
-    // Filter templates based on search query
-    const filteredTemplates = computed(() => {
+    // Filter events based on search query
+    const filteredEvents = computed(() => {
       if (!searchQuery.value) {
-        return AWS_EVENT_TEMPLATES;
+        return eventsStore.events;
       }
       
       const query = searchQuery.value.toLowerCase();
-      return AWS_EVENT_TEMPLATES.filter(template => 
-        template.name.toLowerCase().includes(query) || 
-        template.category.toLowerCase().includes(query)
+      return eventsStore.events.filter(event => 
+        event.name.toLowerCase().includes(query) || 
+        event.category.toLowerCase().includes(query)
       );
+    });
+    
+    // Group events by category for display
+    const groupedEvents = computed(() => {
+      const result = {};
+      
+      filteredEvents.value.forEach(event => {
+        if (!result[event.category]) {
+          result[event.category] = [];
+        }
+        result[event.category].push(event);
+      });
+      
+      return result;
     });
     
     // Toggle dropdown
@@ -131,6 +158,8 @@ export default defineComponent({
       } else {
         emit('dropdown-opened', DROPDOWN_NAME);
         searchQuery.value = '';
+        // Fetch events when opening dropdown
+        eventsStore.fetchEvents();
       }
     };
     
@@ -142,30 +171,38 @@ export default defineComponent({
       }
     });
     
-    // Handle template selection
-    const selectTemplate = (template) => {
-      selectedTemplate.value = template;
+    // Handle event selection
+    const selectEvent = (event) => {
+      selectedEvent.value = event;
       showConfirmModal.value = true;
       emit('dropdown-closed');
     };
     
-    // Confirm template selection and emit event
-    const confirmTemplateSelection = () => {
-      if (selectedTemplate.value) {
-        emit('select-template', selectedTemplate.value);
+    // Confirm event selection and emit event
+    const confirmEventSelection = () => {
+      if (selectedEvent.value) {
+        emit('select-event', selectedEvent.value);
         showConfirmModal.value = false;
-        selectedTemplate.value = null;
+        selectedEvent.value = null;
       }
+    };
+    
+    // Format date for display
+    const formatDate = (timestamp) => {
+      return new Date(timestamp).toLocaleString();
     };
     
     return {
       isActive,
       searchQuery,
-      filteredTemplates,
+      filteredEvents,
+      groupedEvents,
       showConfirmModal,
+      isLoading: computed(() => eventsStore.isLoading),
       toggleDropdown,
-      selectTemplate,
-      confirmTemplateSelection
+      selectEvent,
+      confirmEventSelection,
+      formatDate
     };
   }
 });

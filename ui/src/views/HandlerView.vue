@@ -102,29 +102,28 @@
                 class="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors"
                 @click="showSaveEventModal = true"
                 :disabled="!eventData || isExecuting"
-                title="Save Event"
+                title="Save event"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 21V13H7v8" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 3v4h4" />
                 </svg>
               </button>
               
-              <AWSEventTemplateSelector @select-template="applyAWSTemplate" />
+              <SavedEventSelector 
+                :activeDropdown="activeDropdown"
+                @dropdown-opened="handleDropdownOpen" 
+                @dropdown-closed="handleDropdownClose"
+                @select-event="selectEvent" 
+              />
               
-              <button 
-                v-if="showSavedEvents"
-                class="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors"
-                @click="showSavedEvents = false"
-              >
-                Hide Saved Events
-              </button>
-              <button 
-                v-else
-                class="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors"
-                @click="showSavedEvents = true"
-              >
-                Saved Events
-              </button>
+              <AWSEventTemplateSelector 
+                :activeDropdown="activeDropdown"
+                @dropdown-opened="handleDropdownOpen" 
+                @dropdown-closed="handleDropdownClose"
+                @select-template="applyAWSTemplate" 
+              />
               
               <button 
                 class="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors"
@@ -135,51 +134,20 @@
             </div>
           </div>
           
-          <div class="flex-1 flex overflow-hidden">
+          <div class="flex-1 overflow-hidden">
             <!-- Event Editor -->
-            <div :class="['h-full', showSavedEvents ? 'w-1/2' : 'w-full']">
-              <CodeEditor
-                ref="eventEditor"
-                v-model="eventData"
-                language="json"
-                :theme="isDarkMode ? 'vs-dark' : 'vs'"
-                :key="`event-editor-${isDarkMode}`"
-                :options="{
-                  formatOnPaste: true,
-                  formatOnType: true
-                }"
-                @save="runHandler"
-              />
-            </div>
-            
-            <!-- Saved Events Panel -->
-            <div v-if="showSavedEvents" class="w-1/2 h-full overflow-auto bg-gray-100 dark:bg-dark-200 border-l border-gray-200 dark:border-dark-border">
-              <div v-if="isLoadingEvents" class="p-4 text-center text-gray-500 dark:text-gray-400">
-                Loading events...
-              </div>
-              
-              <div v-else-if="events.length === 0" class="p-4 text-center text-gray-500 dark:text-gray-400">
-                No saved events found
-              </div>
-              
-              <div v-else class="p-2">
-                <div v-for="(eventList, category) in eventsByCategory" :key="category" class="mb-4">
-                  <h3 class="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase px-2 py-1">{{ category }}</h3>
-                  
-                  <div 
-                    v-for="event in eventList" 
-                    :key="event.name"
-                    class="px-3 py-2 text-sm hover:bg-gray-200 dark:hover:bg-dark-hover cursor-pointer rounded transition-colors"
-                    @click="selectEvent(event)"
-                  >
-                    {{ event.name }}
-                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {{ new Date(event.timestamp).toLocaleString() }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <CodeEditor
+              ref="eventEditor"
+              v-model="eventData"
+              language="json"
+              :theme="isDarkMode ? 'vs-dark' : 'vs'"
+              :key="`event-editor-${isDarkMode}`"
+              :options="{
+                formatOnPaste: true,
+                formatOnType: true
+              }"
+              @save="runHandler"
+            />
           </div>
         </div>
       </template>
@@ -373,6 +341,7 @@ import ResizablePanelVertical from '../components/ResizablePanelVertical.vue';
 import SaveEventModal from '../components/SaveEventModal.vue';
 import { notify } from '../components/Notification.vue';
 import AWSEventTemplateSelector from '../components/AWSEventTemplateSelector.vue';
+import SavedEventSelector from '../components/SavedEventSelector.vue';
 import { AWS_EVENT_TEMPLATES } from '../utils/awsEventTemplates';
 
 export default defineComponent({
@@ -384,7 +353,8 @@ export default defineComponent({
     ResizablePanel,
     ResizablePanelVertical,
     SaveEventModal,
-    AWSEventTemplateSelector
+    AWSEventTemplateSelector,
+    SavedEventSelector
   },
   
   setup() {
@@ -405,7 +375,6 @@ export default defineComponent({
     const eventEditor = ref(null);
     const terminal = ref(null);
     const eventData = ref('{}');
-    const showSavedEvents = ref(false);
     const currentSessionId = ref(null);
     const showSaveEventModal = ref(false);
     const selectedEventLabel = ref(null);
@@ -414,6 +383,9 @@ export default defineComponent({
     const showPanelMenu = ref(false);
     const showOutputPanel = ref(true);
     const showResultPanel = ref(true);
+    
+    // Track which dropdown is open to ensure only one at a time
+    const activeDropdown = ref(null);
     
     // On mount, initialize
     onMounted(() => {
@@ -731,7 +703,6 @@ export default defineComponent({
     const selectEvent = (event) => {
       eventData.value = JSON.stringify(event.data, null, 2);
       selectedEventLabel.value = event.name;
-      showSavedEvents.value = false;
     };
     
     const clearLogs = () => {
@@ -863,16 +834,29 @@ export default defineComponent({
     const applyAWSTemplate = (template) => {
       eventData.value = JSON.stringify(template.data, null, 2);
       selectedEventLabel.value = template.name;
-      showSavedEvents.value = false;
     };
     
     const togglePanelMenu = (event) => {
       event.stopPropagation();
       showPanelMenu.value = !showPanelMenu.value;
+      // Close any open dropdowns when toggling panel menu
+      if (showPanelMenu.value && activeDropdown.value) {
+        activeDropdown.value = null;
+      }
     };
     
     const closePanelMenu = () => {
       showPanelMenu.value = false;
+    };
+    
+    // Handle opening a dropdown component
+    const handleDropdownOpen = (name) => {
+      activeDropdown.value = name;
+    };
+    
+    // Handle closing a dropdown component
+    const handleDropdownClose = () => {
+      activeDropdown.value = null;
     };
     
     return {
@@ -880,7 +864,6 @@ export default defineComponent({
       eventEditor,
       terminal,
       eventData,
-      showSavedEvents,
       currentSessionId,
       showSaveEventModal,
       selectedEventLabel,
@@ -893,6 +876,7 @@ export default defineComponent({
       showPanelMenu,
       showOutputPanel,
       showResultPanel,
+      activeDropdown,
       
       // Computed
       currentHandler,
@@ -915,7 +899,9 @@ export default defineComponent({
       getRelativePath,
       applyAWSTemplate,
       togglePanelMenu,
-      closePanelMenu
+      closePanelMenu,
+      handleDropdownOpen,
+      handleDropdownClose
     };
   }
 });
