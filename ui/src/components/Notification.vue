@@ -154,13 +154,17 @@ export const notify = {
 }
 
 .notification {
-  background-color: var(--color-dark-100);
+  background-color: white;
   border-radius: 0.375rem;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   padding: 0.75rem;
   min-width: 20rem;
   max-width: 30rem;
   border-left: 4px solid;
+}
+
+:root.dark .notification {
+  background-color: var(--color-dark-100);
 }
 
 .notification.success {
@@ -201,13 +205,17 @@ export const notify = {
   flex-grow: 1;
   font-size: 0.875rem;
   line-height: 1.25rem;
+  color: #1f2937;
+}
+
+:root.dark .notification-message {
   color: white;
 }
 
 .notification-close {
   background: transparent;
   border: none;
-  color: #9ca3af;
+  color: #6b7280;
   padding: 0;
   cursor: pointer;
   flex-shrink: 0;
@@ -215,6 +223,14 @@ export const notify = {
 }
 
 .notification-close:hover {
+  color: #1f2937;
+}
+
+:root.dark .notification-close {
+  color: #9ca3af;
+}
+
+:root.dark .notification-close:hover {
   color: white;
 }
 

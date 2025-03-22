@@ -2,27 +2,29 @@
   <div class="flex h-full">
     <!-- Sidebar -->
     <aside 
-      class="sidebar-container h-full bg-dark-100 border-r border-dark-border flex flex-col transition-all duration-300" 
+      class="sidebar-container h-full bg-white dark:bg-dark-100 border-r border-gray-200 dark:border-dark-border flex flex-col transition-all duration-300" 
       :class="{ 'w-64': !sidebarCollapsed, 'w-0 -ml-1 opacity-0': sidebarCollapsed }"
     >
       <!-- Logo and title -->
-      <div class="p-4 border-b border-dark-border flex flex-col">
+      <div class="p-4 border-b border-gray-200 dark:border-dark-border flex flex-col">
         <div class="flex justify-between items-center">
           <h1 class="text-xl font-bold text-primary-500">Lambda Running</h1>
           
-          <!-- Toggle sidebar button (visible when sidebar is expanded) -->
-          <button 
-            v-if="!sidebarCollapsed"
-            class="text-gray-400 hover:text-white transition-all focus:outline-none"
-            @click="toggleSidebar"
-            title="Collapse sidebar"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7" />
-            </svg>
-          </button>
+          <div class="flex items-center space-x-2">
+            <!-- Toggle sidebar button (visible when sidebar is expanded) -->
+            <button 
+              v-if="!sidebarCollapsed"
+              class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white transition-all focus:outline-none"
+              @click="toggleSidebar"
+              title="Collapse sidebar"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7" />
+              </svg>
+            </button>
+          </div>
         </div>
-        <p class="text-xs text-gray-400 mt-1">Test your AWS Lambda functions</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Test your AWS Lambda functions</p>
       </div>
       
       <!-- Navigation -->
@@ -40,7 +42,7 @@
                 v-model="searchTerm" 
                 type="text" 
                 placeholder="Search handlers..." 
-                class="w-full bg-dark-200 border border-dark-border rounded p-2 pl-8 text-xs focus:outline-none focus:ring-1 focus:ring-primary-500"
+                class="w-full bg-gray-50 dark:bg-dark-200 border border-gray-200 dark:border-dark-border rounded p-2 pl-8 text-xs focus:outline-none focus:ring-1 focus:ring-primary-500"
               />
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-2 top-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -48,7 +50,7 @@
               <button 
                 v-if="searchTerm" 
                 @click="searchTerm = ''" 
-                class="absolute right-2 top-2 text-gray-400 hover:text-gray-300"
+                class="absolute right-2 top-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -57,7 +59,7 @@
             </div>
           </div>
           
-          <div v-if="isLoadingHandlers" class="px-3 py-2 text-sm text-gray-400">
+          <div v-if="isLoadingHandlers" class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
             <div class="flex items-center">
               <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-primary-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -68,7 +70,7 @@
           </div>
           
           <template v-else-if="handlerError">
-            <div class="px-3 py-2 text-sm text-red-400">
+            <div class="px-3 py-2 text-sm text-red-500">
               {{ handlerError }}
             </div>
           </template>
@@ -78,7 +80,7 @@
               <!-- Directory header (clickable) -->
               <div 
                 @click="toggleDirectory(directory)"
-                class="px-3 py-1.5 text-xs font-medium text-gray-400 hover:bg-dark-hover rounded cursor-pointer flex items-center"
+                class="px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-dark-hover rounded cursor-pointer flex items-center"
               >
                 <div class="flex items-center">
                   <svg 
@@ -139,17 +141,20 @@
             </div>
             
             <!-- No results message -->
-            <div v-if="Object.keys(filteredGroupedHandlers).length === 0" class="px-3 py-2 text-sm text-gray-400">
+            <div v-if="Object.keys(filteredGroupedHandlers).length === 0" class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
               No handlers matching "{{ searchTerm }}"
             </div>
           </template>
         </div>
       </nav>
       
-      <!-- Footer with version -->
-      <div class="p-3 border-t border-dark-border">
-        <div class="text-xs text-gray-500">
-          <span>Lambda Running v{{ version }}</span>
+      <!-- Footer with version and theme toggle -->
+      <div class="p-3 border-t border-gray-200 dark:border-dark-border">
+        <div class="flex justify-between items-center">
+          <div class="text-xs text-gray-500">
+            <span>Lambda Running v{{ version }}</span>
+          </div>
+          <ThemeToggler />
         </div>
       </div>
     </aside>
@@ -157,7 +162,7 @@
     <!-- Toggle sidebar button (visible when sidebar is collapsed) -->
     <button 
       v-if="sidebarCollapsed"
-      class="absolute left-0 top-5 z-30 p-2 bg-dark-100 rounded-r-md text-gray-400 hover:text-white transition-all focus:outline-none"
+      class="absolute left-0 top-5 z-30 p-2 bg-white dark:bg-dark-100 rounded-r-md text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all focus:outline-none"
       @click="toggleSidebar"
       title="Expand sidebar"
     >
@@ -171,14 +176,14 @@
       class="flex-1 h-full overflow-hidden relative transition-all duration-300"
     >
       <!-- Loading overlay -->
-      <div v-if="isInitializing" class="absolute inset-0 bg-dark-200 bg-opacity-75 z-10 flex items-center justify-center">
+      <div v-if="isInitializing" class="absolute inset-0 bg-gray-200 dark:bg-dark-200 bg-opacity-75 z-10 flex items-center justify-center">
         <div class="text-center">
           <svg class="animate-spin h-10 w-10 text-primary-500 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <p class="text-lg font-medium text-white">Initializing Lambda Running...</p>
-          <p class="text-sm text-gray-400 mt-2">Loading handlers and connecting to server</p>
+          <p class="text-lg font-medium text-gray-900 dark:text-white">Initializing Lambda Running...</p>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">Loading handlers and connecting to server</p>
         </div>
       </div>
       
@@ -197,12 +202,14 @@ import { useExecutionStore } from './stores/execution'
 import { useRouter } from 'vue-router'
 import { notify } from './components/Notification.vue'
 import Notification from './components/Notification.vue'
+import ThemeToggler from './components/ThemeToggler.vue'
 
 export default defineComponent({
   name: 'App',
   
   components: {
-    Notification
+    Notification,
+    ThemeToggler
   },
   
   setup() {
@@ -394,10 +401,10 @@ export default defineComponent({
 }
 
 .sidebar-item {
-  @apply block px-3 py-1 rounded text-gray-300 hover:bg-dark-hover;
+  @apply block px-3 py-1 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-hover;
 }
 
 .sidebar-item.active {
-  @apply bg-dark-hover text-white;
+  @apply bg-primary-100 dark:bg-primary-500 dark:bg-opacity-10 text-primary-700 dark:text-white;
 }
 </style> 

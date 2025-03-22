@@ -62,10 +62,10 @@ describe('Terminal Component', () => {
     const logElements = wrapper.findAll('.py-1');
     expect(logElements.length).toBe(logs.length);
     
-    expect(logElements[0].classes()).toContain('text-white'); // log type
-    expect(logElements[1].classes()).toContain('text-red-400'); // error type
-    expect(logElements[2].classes()).toContain('text-cyan-400'); // info type
-    expect(logElements[3].classes()).toContain('text-yellow-400'); // warn type
+    expect(logElements[0].classes()).toContain('text-gray-900'); // log type
+    expect(logElements[1].classes()).toContain('text-red-600'); // error type
+    expect(logElements[2].classes()).toContain('text-blue-600'); // info type
+    expect(logElements[3].classes()).toContain('text-yellow-600'); // warn type
   });
   
   // Test timestamp formatting

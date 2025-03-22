@@ -89,81 +89,82 @@ export default defineComponent({
       });
     };
     
-    // Initialize editor with minimal features
-    onMounted(async () => {
+    // Initialize Monaco editor
+    const initMonaco = async () => {
       if (!editorContainer.value) return;
       
-      try {
-        // Load Monaco from CDN
-        monaco = await loadMonacoFromCDN();
-        
-        // Define custom dark theme
-        monaco.editor.defineTheme('lambda-dark', {
-          base: 'vs-dark',
-          inherit: true,
-          rules: [
-            { token: 'comment', foreground: '6A9955' },
-            { token: 'keyword', foreground: 'C792EA' },
-            { token: 'string', foreground: 'C3E88D' },
-            { token: 'number', foreground: 'F78C6C' },
-          ],
-          colors: {
-            'editor.background': '#0e1117',
-            'editor.foreground': '#c8d3f5',
-            'editorCursor.foreground': '#c8d3f5',
-            'editor.lineHighlightBackground': '#171c28',
-            'editorLineNumber.foreground': '#545454',
-            'editor.selectionBackground': '#383d51',
-            'editorSuggestWidget.background': '#171c28',
-            'editorSuggestWidget.border': '#232534',
-            'editorSuggestWidget.foreground': '#c8d3f5',
-            'editorSuggestWidget.selectedBackground': '#2d3348',
-          }
-        });
-        
-        // Create editor with improved dark theme
-        editor = monaco.editor.create(editorContainer.value, {
-          value: props.modelValue,
-          language: props.language,
-          theme: 'lambda-dark', // Use our custom dark theme
-          automaticLayout: true,
-          minimap: { enabled: false },
-          scrollBeyondLastLine: false,
-          fontSize: 14,
-          fontFamily: 'monospace',
-          tabSize: 2,
-          readOnly: props.readOnly,
-          lineNumbers: 'on',
-          scrollbar: {
-            useShadows: false,
-            verticalScrollbarSize: 10,
-            horizontalScrollbarSize: 10
-          },
-          ...props.options,
-        });
-        
-        // Add keyboard shortcut for format (SHIFT+ALT+F)
-        editor.addCommand(
-          monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
-          function() {
-            format();
-          }
-        );
-        
-        // Set up content change listener
-        subscription = editor.onDidChangeModelContent(() => {
-          const value = editor.getValue();
-          emit('update:modelValue', value);
-        });
-        
-        // Let parent know the editor is ready
-        emit('editor-mounted', editor);
-        
-        loading.value = false;
-      } catch (error) {
-        console.error('Failed to load Monaco editor:', error);
-        loading.value = false;
-      }
+      // Load Monaco dynamically
+      monaco = await import('monaco-editor');
+      loading.value = false;
+      
+      // Determine current theme
+      const isDarkMode = document.documentElement.classList.contains('dark');
+      const currentTheme = isDarkMode ? 'vs-dark' : 'vs';
+      
+      // Define custom themes for light and dark modes
+      monaco.editor.defineTheme('lambda-dark', {
+        base: 'vs-dark',
+        inherit: true,
+        rules: [],
+        colors: {
+          'editor.background': '#0e1117',
+          'editor.foreground': '#c8d3f5',
+          'editorCursor.foreground': '#c8d3f5',
+          'editor.lineHighlightBackground': '#171c28',
+          'editorLineNumber.foreground': '#4b5563',
+          'editor.selectionBackground': '#283457',
+          'editorGutter.background': '#0e1117',
+        }
+      });
+      
+      monaco.editor.defineTheme('lambda-light', {
+        base: 'vs',
+        inherit: true,
+        rules: [],
+        colors: {
+          'editor.background': '#f8fafc',
+          'editor.foreground': '#1e293b',
+          'editorCursor.foreground': '#1e293b',
+          'editor.lineHighlightBackground': '#f1f5f9',
+          'editorLineNumber.foreground': '#64748b',
+          'editor.selectionBackground': '#e2e8f0',
+          'editorGutter.background': '#f8fafc',
+        }
+      });
+      
+      // Define editor options
+      const defaultOptions = {
+        ...props.options,
+        value: props.modelValue,
+        language: props.language,
+        theme: isDarkMode ? 'lambda-dark' : 'lambda-light',
+        readOnly: props.readOnly,
+        automaticLayout: true,
+        minimap: {
+          enabled: false,
+        },
+        scrollBeyondLastLine: false,
+      };
+      
+      // Create editor instance
+      editor = monaco.editor.create(editorContainer.value, defaultOptions);
+      
+      // Add keyboard shortcut for format (SHIFT+ALT+F)
+      editor.addCommand(
+        monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
+        function() {
+          format();
+        }
+      );
+      
+      // Set up content change listener
+      subscription = editor.onDidChangeModelContent(() => {
+        const value = editor.getValue();
+        emit('update:modelValue', value);
+      });
+      
+      // Let parent know the editor is ready
+      emit('editor-mounted', editor);
       
       // Handle window resize
       const handleResize = () => {
@@ -184,7 +185,7 @@ export default defineComponent({
           editor.dispose();
         }
       });
-    });
+    };
     
     // Watch for prop changes
     watch(() => props.modelValue, (newValue) => {
@@ -200,6 +201,77 @@ export default defineComponent({
       }
     });
     
+    // Watch for theme changes
+    watch(() => document.documentElement.classList.contains('dark'), (isDark) => {
+      if (editor && monaco) {
+        const theme = isDark ? 'lambda-dark' : 'lambda-light';
+        monaco.editor.setTheme(theme);
+        
+        // Store current value and cursor position
+        const value = editor.getValue();
+        const position = editor.getPosition();
+        
+        // Force refresh by recreating the editor
+        if (subscription) {
+          subscription.dispose();
+        }
+        editor.dispose();
+        
+        // Recreate with new theme
+        editor = monaco.editor.create(editorContainer.value, {
+          ...props.options,
+          value: value,
+          language: props.language,
+          theme: theme,
+          readOnly: props.readOnly,
+          automaticLayout: true,
+          minimap: {
+            enabled: false,
+          },
+          scrollBeyondLastLine: false,
+        });
+        
+        // Restore cursor position
+        if (position) {
+          editor.setPosition(position);
+          editor.revealPositionInCenter(position);
+        }
+        
+        // Set up content change listener again
+        subscription = editor.onDidChangeModelContent(() => {
+          emit('update:modelValue', editor.getValue());
+        });
+        
+        // Add keyboard shortcut for format (SHIFT+ALT+F) again
+        editor.addCommand(
+          monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
+          function() {
+            format();
+          }
+        );
+      }
+    });
+    
+    // Watch for prop changes
+    watch(() => props.theme, (newTheme) => {
+      if (editor && monaco) {
+        // Map the vs/vs-dark theme prop to our custom themes
+        const actualTheme = newTheme === 'vs-dark' ? 'lambda-dark' : 'lambda-light';
+        
+        // When the theme prop changes directly, apply it
+        monaco.editor.setTheme(actualTheme);
+        
+        // Force internal Monaco components to refresh
+        setTimeout(() => {
+          editor.layout();
+        }, 100);
+      }
+    });
+    
+    onMounted(() => {
+      initMonaco();
+    });
+    
     return {
       editorContainer,
       loading,
@@ -213,6 +285,18 @@ export default defineComponent({
 .monaco-editor-container {
   border-radius: 0.375rem;
   overflow: hidden;
-  background-color: #0e1117;
+  background-color: var(--color-terminal-background);
+}
+
+.monaco-editor {
+  background-color: var(--color-terminal-background) !important;
+}
+
+.dark .monaco-editor-container {
+  background-color: var(--color-terminal-background);
+}
+
+.monaco-editor .margin {
+  background-color: var(--color-terminal-background) !important;
 }
 </style> 

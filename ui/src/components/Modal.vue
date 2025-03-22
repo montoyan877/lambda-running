@@ -89,7 +89,7 @@ export default defineComponent({
 }
 
 .modal-container {
-  background-color: var(--color-dark-100);
+  background-color: white;
   border-radius: 0.5rem;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   width: 30rem;
@@ -100,22 +100,34 @@ export default defineComponent({
   flex-direction: column;
 }
 
+:root.dark .modal-container {
+  background-color: var(--color-dark-100);
+}
+
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+:root.dark .modal-header {
   border-bottom: 1px solid var(--color-dark-border);
 }
 
 .modal-title {
   font-size: 1.25rem;
   font-weight: 600;
+  color: #111827;
+}
+
+:root.dark .modal-title {
   color: white;
 }
 
 .modal-close {
-  color: #9ca3af;
+  color: #6b7280;
   background-color: transparent;
   border: none;
   cursor: pointer;
@@ -125,6 +137,15 @@ export default defineComponent({
 }
 
 .modal-close:hover {
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+:root.dark .modal-close {
+  color: #9ca3af;
+}
+
+:root.dark .modal-close:hover {
   background-color: var(--color-dark-hover);
   color: white;
 }
@@ -138,6 +159,10 @@ export default defineComponent({
   display: flex;
   justify-content: flex-end;
   padding: 1rem 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+:root.dark .modal-footer {
   border-top: 1px solid var(--color-dark-border);
 }
 </style> 

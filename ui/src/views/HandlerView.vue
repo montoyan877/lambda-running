@@ -1,11 +1,11 @@
 <template>
   <div class="flex flex-col h-full">
     <!-- Header -->
-    <header class="p-4 border-b border-dark-border bg-dark-100">
+    <header class="p-4 border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-100">
       <div class="flex items-center justify-between">
         <div :class="{ 'pl-6': sidebarCollapsed }">
           <h1 class="text-xl font-bold">Handler Testing</h1>
-          <p v-if="currentHandler" class="text-sm text-gray-400 mt-1">
+          <p v-if="currentHandler" class="text-sm text-gray-500 dark:text-gray-400 mt-1">
             {{ currentHandler.relativePath || getRelativePath(currentHandler.path) }}
           </p>
         </div>
@@ -48,10 +48,10 @@
       <template #left>
         <!-- Event Editor -->
         <div class="h-full flex flex-col">
-          <div class="p-3 border-b border-dark-border bg-dark-100 flex justify-between items-center">
+          <div class="p-3 border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-100 flex justify-between items-center">
             <div class="flex items-center gap-2">
               <h2 class="font-medium">Event Data</h2>
-              <span v-if="selectedEventLabel" class="text-xs px-2 py-0.5 rounded-full bg-dark-300 text-gray-300">
+              <span v-if="selectedEventLabel" class="text-xs px-2 py-0.5 rounded-full bg-gray-200 dark:bg-dark-300 text-gray-700 dark:text-gray-300">
                 {{ selectedEventLabel }}
               </span>
             </div>
@@ -61,21 +61,21 @@
               
               <button 
                 v-if="showSavedEvents"
-                class="text-xs px-2 py-1 rounded bg-dark-hover hover:bg-dark-300 transition-colors"
+                class="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors"
                 @click="showSavedEvents = false"
               >
                 Hide Saved Events
               </button>
               <button 
                 v-else
-                class="text-xs px-2 py-1 rounded bg-dark-hover hover:bg-dark-300 transition-colors"
+                class="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors"
                 @click="showSavedEvents = true"
               >
                 Saved Events
               </button>
               
               <button 
-                class="text-xs px-2 py-1 rounded bg-dark-hover hover:bg-dark-300 transition-colors"
+                class="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors"
                 @click="formatEvent"
               >
                 Format
@@ -90,7 +90,8 @@
                 ref="eventEditor"
                 v-model="eventData"
                 language="json"
-                theme="dark"
+                :theme="isDarkMode ? 'vs-dark' : 'vs'"
+                :key="`event-editor-${isDarkMode}`"
                 :options="{
                   formatOnPaste: true,
                   formatOnType: true
@@ -100,27 +101,27 @@
             </div>
             
             <!-- Saved Events Panel -->
-            <div v-if="showSavedEvents" class="w-1/2 h-full overflow-auto bg-dark-200 border-l border-dark-border">
-              <div v-if="isLoadingEvents" class="p-4 text-center text-gray-400">
+            <div v-if="showSavedEvents" class="w-1/2 h-full overflow-auto bg-gray-100 dark:bg-dark-200 border-l border-gray-200 dark:border-dark-border">
+              <div v-if="isLoadingEvents" class="p-4 text-center text-gray-500 dark:text-gray-400">
                 Loading events...
               </div>
               
-              <div v-else-if="events.length === 0" class="p-4 text-center text-gray-400">
+              <div v-else-if="events.length === 0" class="p-4 text-center text-gray-500 dark:text-gray-400">
                 No saved events found
               </div>
               
               <div v-else class="p-2">
                 <div v-for="(eventList, category) in eventsByCategory" :key="category" class="mb-4">
-                  <h3 class="text-xs font-semibold text-gray-400 uppercase px-2 py-1">{{ category }}</h3>
+                  <h3 class="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase px-2 py-1">{{ category }}</h3>
                   
                   <div 
                     v-for="event in eventList" 
                     :key="event.name"
-                    class="px-3 py-2 text-sm hover:bg-dark-hover cursor-pointer rounded transition-colors"
+                    class="px-3 py-2 text-sm hover:bg-gray-200 dark:hover:bg-dark-hover cursor-pointer rounded transition-colors"
                     @click="selectEvent(event)"
                   >
                     {{ event.name }}
-                    <div class="text-xs text-gray-500 mt-1">
+                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       {{ new Date(event.timestamp).toLocaleString() }}
                     </div>
                   </div>
@@ -134,12 +135,12 @@
       <template #right>
         <!-- Results Panel -->
         <div class="h-full flex flex-col">
-          <div class="p-3 border-b border-dark-border bg-dark-100 flex justify-between items-center">
+          <div class="p-3 border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-100 flex justify-between items-center">
             <h2 class="font-medium">Output</h2>
             
             <div class="flex space-x-2">
               <button 
-                class="text-xs px-2 py-1 rounded bg-dark-hover hover:bg-dark-300 transition-colors"
+                class="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors"
                 @click="clearLogs"
               >
                 Clear
@@ -147,7 +148,7 @@
             </div>
           </div>
           
-          <ResizablePanelVertical class="flex-1" :initialSplit="50">
+          <ResizablePanelVertical class="flex-1" :initialSplit="60">
             <template #top>
               <!-- Terminal Output -->
               <div class="h-full overflow-hidden">
@@ -161,16 +162,16 @@
             <template #bottom>
               <!-- Result JSON -->
               <div class="h-full overflow-hidden flex flex-col">
-                <div class="p-3 border-b border-dark-border bg-dark-100 flex justify-between items-center">
+                <div class="p-3 border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-100 flex justify-between items-center">
                   <h3 class="font-medium">Result</h3>
                   
                   <div v-if="currentResult" class="text-xs">
                     <span 
-                      :class="currentResult.success ? 'text-green-400' : 'text-red-400'"
+                      :class="currentResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
                     >
                       {{ currentResult.success ? 'Success' : 'Failed' }}
                     </span>
-                    <span class="text-gray-400 ml-2">
+                    <span class="text-gray-500 dark:text-gray-400 ml-2">
                       {{ formatDuration(currentResult.duration) }}
                     </span>
                   </div>
@@ -181,10 +182,11 @@
                     v-if="currentResult"
                     :modelValue="formatResultOutput(currentResult)"
                     language="json"
-                    theme="dark"
+                    :theme="isDarkMode ? 'vs-dark' : 'vs'"
+                    :key="`result-editor-${isDarkMode}`"
                     :readOnly="true"
                   />
-                  <div v-else class="p-4 text-center text-gray-400 h-full flex items-center justify-center">
+                  <div v-else class="p-4 text-center text-gray-500 dark:text-gray-400 h-full flex items-center justify-center">
                     <p>Run handler to see results</p>
                   </div>
                 </div>
@@ -243,6 +245,9 @@ export default defineComponent({
     // Get sidebarCollapsed state from App component
     const sidebarCollapsed = inject('sidebarCollapsed', ref(false));
     
+    // Track dark mode state
+    const isDarkMode = ref(document.documentElement.classList.contains('dark'));
+    
     // UI State
     const eventEditor = ref(null);
     const terminal = ref(null);
@@ -286,6 +291,22 @@ export default defineComponent({
       
       // Add global event listener for Ctrl+Enter
       window.addEventListener('keydown', handleKeydown);
+
+      // Watch for theme changes
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.attributeName === 'class') {
+            isDarkMode.value = document.documentElement.classList.contains('dark');
+          }
+        });
+      });
+      
+      observer.observe(document.documentElement, { attributes: true });
+      
+      // Clean up observer
+      onBeforeUnmount(() => {
+        observer.disconnect();
+      });
     });
     
     // Remove event listener on unmount
@@ -641,6 +662,7 @@ export default defineComponent({
       
       // UI State
       sidebarCollapsed,
+      isDarkMode,
       
       // Computed
       currentHandler,

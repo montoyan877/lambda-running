@@ -14,8 +14,10 @@ module.exports = {
         'dark-hover': 'var(--color-dark-hover)',
         'dark-border': 'var(--color-dark-border)',
         
+        'primary-100': 'var(--color-primary-100)',
         'primary-500': 'var(--color-primary-500)',
         'primary-600': 'var(--color-primary-600)',
+        'primary-700': 'var(--color-primary-700)',
         
         'secondary-500': 'var(--color-secondary-500)',
         'secondary-600': 'var(--color-secondary-600)',

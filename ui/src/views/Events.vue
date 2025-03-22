@@ -1,31 +1,24 @@
 <template>
-  <div class="flex flex-col h-full">
+  <div class="h-full flex flex-col">
     <!-- Header -->
-    <header class="p-4 border-b border-dark-border bg-dark-100">
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-xl font-bold">Saved Events</h1>
-          <p class="text-sm text-gray-400 mt-1">
-            Manage events for Lambda function testing
-          </p>
-        </div>
+    <header class="p-4 border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-100">
+      <div class="flex justify-between items-center">
+        <h1 class="text-xl font-bold">Saved Events</h1>
         
-        <div class="flex space-x-3">
-          <button 
-            class="btn btn-secondary text-sm"
-            @click="createNewEvent"
-          >
-            Create New Event
+        <div class="flex space-x-2">
+          <button class="btn btn-primary text-sm" @click="createNewEvent">
+            New Event
           </button>
         </div>
       </div>
     </header>
     
-    <!-- Content -->
-    <div class="flex-1 flex overflow-hidden">
-      <!-- Event List -->
-      <div class="w-1/3 border-r border-dark-border overflow-auto">
-        <div class="p-4">
+    <!-- Main content -->
+    <div class="flex-1 grid grid-cols-4 overflow-hidden">
+      <!-- Events sidebar -->
+      <div class="h-full border-r border-gray-200 dark:border-dark-border flex flex-col overflow-hidden">
+        <!-- Search and filter -->
+        <div class="p-4 border-b border-gray-200 dark:border-dark-border">
           <div class="relative rounded-md shadow-sm">
             <input 
               type="text" 
@@ -45,16 +38,14 @@
           Loading events...
         </div>
         
-        <div v-else-if="filteredEvents.length === 0" class="p-8 text-center text-gray-400">
-          No events found
-          <div class="mt-2 text-sm">
-            {{ searchQuery ? 'Try a different search' : 'Create your first event' }}
-          </div>
+        <div v-else-if="filteredEvents.length === 0" class="p-4 text-center">
+          <p class="text-gray-500 dark:text-gray-400">No events found</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">Try adjusting your search or create a new event</p>
         </div>
         
         <div v-else>
           <div v-for="(eventList, category) in groupedEvents" :key="category" class="mb-4">
-            <h3 class="text-xs font-semibold text-gray-400 uppercase px-4 py-2">{{ category }}</h3>
+            <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase px-4 py-2">{{ category }}</h3>
             
             <div 
               v-for="event in eventList" 
@@ -62,8 +53,8 @@
               :class="[
                 'px-4 py-3 border-l-2 cursor-pointer transition-colors',
                 activeEvent && activeEvent.name === event.name && activeEvent.category === event.category
-                  ? 'bg-dark-hover border-primary-500'
-                  : 'border-transparent hover:bg-dark-hover'
+                  ? 'bg-gray-100 dark:bg-dark-hover border-primary-500'
+                  : 'border-transparent hover:bg-gray-50 dark:hover:bg-dark-hover'
               ]"
               @click="selectEvent(event)"
             >
@@ -91,9 +82,9 @@
       
       <!-- Event Details -->
       <div class="w-2/3 flex flex-col">
-        <div v-if="!activeEvent" class="flex-1 flex items-center justify-center p-8 text-center text-gray-400">
+        <div v-if="!activeEvent" class="flex-1 flex items-center justify-center p-8 text-center text-gray-500 dark:text-gray-400">
           <div>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <h2 class="text-xl font-medium mb-2">No Event Selected</h2>
@@ -102,11 +93,11 @@
         </div>
         
         <template v-else>
-          <div class="p-4 border-b border-dark-border bg-dark-100 flex justify-between items-center">
+          <div class="p-4 border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-100 flex justify-between items-center">
             <div>
               <h2 class="font-medium">
                 {{ activeEvent.name }}
-                <span class="text-sm font-normal text-gray-400 ml-2">
+                <span class="text-sm font-normal text-gray-500 dark:text-gray-400 ml-2">
                   ({{ activeEvent.category }})
                 </span>
               </h2>
@@ -138,7 +129,8 @@
               ref="editor"
               v-model="editedData"
               language="json"
-              theme="dark"
+              :theme="isDarkMode ? 'vs-dark' : 'vs'"
+              :key="`event-editor-${isDarkMode}`"
               :options="{
                 formatOnPaste: true,
                 formatOnType: true
@@ -153,7 +145,7 @@
 </template>
 
 <script>
-import { defineComponent, ref, computed, watch, onMounted } from 'vue';
+import { defineComponent, ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useEventsStore } from '../stores/events';
 import CodeEditor from '../components/CodeEditor.vue';
 
@@ -167,6 +159,7 @@ export default defineComponent({
   setup() {
     const eventsStore = useEventsStore();
     const editor = ref(null);
+    const isDarkMode = ref(document.documentElement.classList.contains('dark'));
     
     // State
     const searchQuery = ref('');
@@ -176,6 +169,22 @@ export default defineComponent({
     // Load events when component mounts
     onMounted(() => {
       eventsStore.fetchEvents();
+      
+      // Watch for theme changes
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.attributeName === 'class') {
+            isDarkMode.value = document.documentElement.classList.contains('dark');
+          }
+        });
+      });
+      
+      observer.observe(document.documentElement, { attributes: true });
+      
+      // Clean up observer
+      onBeforeUnmount(() => {
+        observer.disconnect();
+      });
     });
     
     // Computed properties
@@ -317,6 +326,7 @@ export default defineComponent({
       editedData,
       hasChanges,
       editor,
+      isDarkMode,
       
       // Methods
       formatDate,

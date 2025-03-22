@@ -63,7 +63,7 @@
     <div v-if="showConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div class="bg-dark-100 rounded-lg shadow-xl max-w-md w-full p-4">
         <h3 class="text-lg font-medium mb-2">Replace Event Data?</h3>
-        <p class="text-sm text-gray-300 mb-4">
+        <p class="text-sm dark:text-gray-300 mb-4">
           This will replace your current event data with the selected template. Are you sure you want to continue?
         </p>
         <div class="flex justify-end space-x-2">

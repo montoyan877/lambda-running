@@ -6,6 +6,26 @@ import './assets/css/main.css'
 import axios from 'axios'
 import Notification from './components/Notification.vue'
 
+// Initialize theme settings
+function initTheme() {
+  // Check if user has previously selected a theme
+  const savedTheme = localStorage.getItem('theme')
+  
+  if (savedTheme === 'light') {
+    document.documentElement.classList.remove('dark')
+  } else if (savedTheme === 'dark') {
+    document.documentElement.classList.add('dark')
+  } else {
+    // No saved preference, default to dark mode
+    document.documentElement.classList.add('dark')
+    // Store this preference
+    localStorage.setItem('theme', 'dark')
+  }
+}
+
+// Initialize theme
+initTheme()
+
 // Comprobar si el servidor API está disponible
 async function checkApiServer() {
   try {
