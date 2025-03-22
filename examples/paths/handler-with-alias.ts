@@ -5,12 +5,13 @@
 // Import using path alias (this would typically be '@/examples/paths/types')
 // For this example, since we're in the same project, we'll use a simpler alias
 import { User, ApiResponse, LambdaEvent } from '@/examples/paths/types';
+import { print } from '@/examples/paths/utils';
 
 /**
  * Lambda function that handles user operations using imported types from path aliases
  */
 export const handler = async (event: LambdaEvent, context: any): Promise<ApiResponse<any>> => {
-  console.log(`Processing request with ID: ${context.awsRequestId}`);
+  print(`Processing request with ID: ${context.awsRequestId}`);
   
   if (event.action === 'getUser') {
     if (!event.userId) {

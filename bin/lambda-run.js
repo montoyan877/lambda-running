@@ -293,6 +293,118 @@ program
     }
   });
 
+// Init command - generate configuration files
+program
+  .command('init')
+  .description('Create initial configuration files (lambda-running.json and .lambdarunignore)')
+  .option('--force', 'Overwrite existing files if they exist')
+  .action(async (options) => {
+    try {
+      console.log(chalk.blue('Initializing Lambda Running configuration...'));
+      
+      const outputDir = process.cwd();
+      const force = options.force || false;
+      let filesCreated = 0;
+      
+      // Generate lambda-running.json
+      const configPath = path.join(outputDir, 'lambda-running.json');
+      if (fs.existsSync(configPath) && !force) {
+        console.log(chalk.yellow(`Config file already exists at ${configPath}. Use --force to overwrite.`));
+      } else {
+        // Create a readable configuration
+        const config = {
+          layers: [],
+          layerMappings: {},
+          envFiles: ['.env'],
+          ignorePatterns: [
+            '**/*.test.js',
+            '**/*.spec.js',
+            '**/__tests__/**'
+          ],
+          ignoreLayerFilesOnScan: true,
+          debug: false
+        };
+        
+        // Write the file with nice formatting
+        fs.writeFileSync(
+          configPath, 
+          JSON.stringify(config, null, 2)
+        );
+        
+        console.log(chalk.green(`Created configuration file at ${configPath}`));
+        filesCreated++;
+      }
+      
+      // Generate .lambdarunignore
+      const ignorePath = path.join(outputDir, '.lambdarunignore');
+      if (fs.existsSync(ignorePath) && !force) {
+        console.log(chalk.yellow(`Ignore file already exists at ${ignorePath}. Use --force to overwrite.`));
+      } else {
+        // Default ignore patterns
+        const ignorePatterns = [
+          '# Lambda Running ignore file',
+          '# Files and directories matching these patterns will be ignored when scanning for handlers',
+          '',
+          '# Dependencies',
+          'node_modules/',
+          'package-lock.json',
+          'yarn.lock',
+          'cdk.out',
+          '',
+          '# Tests',
+          'test/',
+          'tests/',
+          '**/*.test.js',
+          '**/*.spec.js',
+          '**/__tests__/',
+          '**/__mocks__/',
+          '',
+          '# Build files',
+          'dist/',
+          'build/',
+          'coverage/',
+          '',
+          '# Config files',
+          '*.config.js',
+          '.eslintrc*',
+          '.prettier*',
+          '',
+          '# Documentation',
+          'docs/',
+          'README.md',
+          'LICENSE',
+          '',
+          '# Version control',
+          '.git/',
+          '.github/',
+          '.gitignore',
+          '',
+          '# IDE files',
+          '.vscode/',
+          '.idea/',
+          '*.sublime-*',
+          ''
+        ].join('\n');
+        
+        // Write the file
+        fs.writeFileSync(ignorePath, ignorePatterns);
+        
+        console.log(chalk.green(`Created ignore file at ${ignorePath}`));
+        filesCreated++;
+      }
+      
+      if (filesCreated > 0) {
+        console.log(chalk.green('Initialization complete. You may need to customize the files for your project.'));
+      } else {
+        console.log(chalk.yellow('No files were created. Use --force to overwrite existing files.'));
+      }
+    } catch (error) {
+      console.error(chalk.red(`Error initializing configuration: ${error.message}`));
+      console.error(error.stack);
+      process.exit(1);
+    }
+  });
+
 // UI mode
 program
   .command('ui')

@@ -1,6 +1,6 @@
 # 🖥️ Lambda Running: CLI Reference
 
-This guide provides a comprehensive reference for all command-line interface (CLI) commands available in Lambda Running.
+This guide provides a reference for the command-line interface (CLI) commands available in Lambda Running.
 
 ## 🌐 Global Options
 
@@ -10,101 +10,66 @@ These options apply to most commands:
 |--------|-------|-------------|---------|
 | `--help` | `-h` | Show help information | |
 | `--version` | `-v` | Show version information | |
-| `--config` | `-c` | Path to config file | `lambda-running.json` |
-| `--verbose` | | Enable verbose logging | `false` |
-| `--silent` | | Disable all output except errors | `false` |
-| `--json` | | Output in JSON format | `false` |
 
 ## 📋 Command Summary
 
 | Command | Description |
 |---------|-------------|
-| `lambda-run <handler>` | Run a Lambda handler |
-| `lambda-run ui` | Start the UI server |
-| `lambda-run init` | Initialize a new configuration |
-| `lambda-run list` | List available handlers |
-| `lambda-run save-event` | Save an event for reuse |
+| `lambda-run run <handler-path> <handler-method>` | Run a Lambda handler |
+| `lambda-run scan [directory]` | Scan for Lambda handlers |
 | `lambda-run events` | List saved events |
-| `lambda-run watch` | Run a handler in watch mode |
-| `lambda-run logs` | Display execution logs |
-| `lambda-run export` | Export handler for deployment |
-| `lambda-run import` | Import event from AWS |
+| `lambda-run delete-event <name>` | Delete a saved event |
+| `lambda-run interactive` | Launch interactive mode |
+| `lambda-run ui` | Start the UI server |
+| `lambda-run init` | Initialize configuration files |
 
 ## 🏃‍♂️ Running Lambda Handlers
 
 ### Basic Usage
 
 ```bash
-lambda-run <handler-path> [handler-name]
+lambda-run run <handler-path> <handler-method> [options]
 ```
-
-If `handler-name` is omitted, it defaults to `handler`.
 
 ### Examples
 
 ```bash
 # Run the 'handler' function in hello.js
-lambda-run hello.js
+lambda-run run hello.js handler
 
 # Run the 'processOrder' function in orders.js
-lambda-run orders.js processOrder
-
-# Run a TypeScript handler
-lambda-run src/handler.ts
+lambda-run run orders.js processOrder -e event.json
 ```
 
 ### Options
 
 | Option | Alias | Description | Default |
 |--------|-------|-------------|---------|
-| `--event` | `-e` | Path to event JSON file | `{}` |
-| `--inline-event` | `-i` | Inline JSON event data | |
-| `--name` | `-n` | Name of saved event to use | |
-| `--env-file` | | Path to .env file | `./.env` |
-| `--env` | `-v` | Set environment variables | |
-| `--timeout` | `-t` | Function timeout (ms) | `30000` |
-| `--memory-size` | `-m` | Function memory size (MB) | `128` |
-| `--aws-region` | `-r` | AWS region to use | `us-east-1` |
-| `--save-result` | | Save execution result to file | |
-| `--watch` | `-w` | Watch for file changes | `false` |
-| `--debug` | `-d` | Enable Node.js inspector | `false` |
+| `--event` | `-e` | JSON string or path to event file | `{}` |
+| `--event-name` | `-n` | Name of saved event to use | |
+| `--category` | `-c` | Category of saved event | `default` |
+| `--save` | `-s` | Save the event for future use | |
+| `--no-env` | | Do not load environment variables | `false` |
 
-## 💻 UI Server Commands
+## 🔍 Handler Discovery
 
-### Starting the UI Server
+### Scanning for Handlers
 
 ```bash
-lambda-run ui [options]
+lambda-run scan [directory] [options]
 ```
 
-### UI Options
+The `scan` command searches for potential Lambda handlers in the specified directory.
+
+### Scan Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--port` | Port to listen on | `3000` |
-| `--host` | Host to bind to | `localhost` |
-| `--no-open` | Don't open browser | `false` |
-| `--theme` | UI theme (light/dark/system) | `system` |
-| `--base-path` | Base path for UI | `/` |
-| `--auth-user` | Basic auth username | |
-| `--auth-pass` | Basic auth password | |
+| `--extensions` | File extensions to include | `.js,.ts` |
+| `--include-node-modules` | Include node_modules directory | `false` |
+| `--no-ignore-file` | Ignore the .lambdarunignore file | `false` |
 
 ## 📁 Event Management
-
-### Saving Events
-
-```bash
-lambda-run save-event [options] <event-name>
-```
-
-### Event Save Options
-
-| Option | Alias | Description | Default |
-|--------|-------|-------------|---------|
-| `--event` | `-e` | Path to event JSON file | |
-| `--inline-event` | `-i` | Inline JSON event data | |
-| `--description` | `-d` | Event description | |
-| `--tags` | `-t` | Tags for the event (comma-separated) | |
 
 ### Listing Events
 
@@ -116,38 +81,51 @@ lambda-run events [options]
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--filter` | Filter events by name or tag | |
-| `--json` | Output in JSON format | `false` |
+| `--category` | Filter events by category | |
 
-## 🔄 Watch Mode
+### Deleting Events
 
 ```bash
-lambda-run watch <handler-path> [handler-name] [options]
+lambda-run delete-event <name> [options]
 ```
 
-### Watch Options
+### Delete Event Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--watch-dirs` | Directories to watch (comma-separated) | `./` |
-| `--ignore` | Glob patterns to ignore | `node_modules` |
-| `--delay` | Debounce delay (ms) | `500` |
+| `--category` | Category of the event | `default` |
 
-## 🔎 Handler Discovery
-
-### Listing Available Handlers
+## 💻 Interactive Mode
 
 ```bash
-lambda-run list [options]
+lambda-run interactive
 ```
 
-### List Options
+Or use the alias:
+
+```bash
+lambda-run i
+```
+
+Interactive mode provides a guided interface to:
+- Select a handler from those available in your project
+- Choose or create an event
+- Run the handler with the selected event
+- View the execution results
+- Save events for future use
+
+## 🖥️ UI Mode
+
+```bash
+lambda-run ui [options]
+```
+
+### UI Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--dirs` | Directories to scan (comma-separated) | `./` |
-| `--pattern` | File pattern to match | `**/*.{js,ts}` |
-| `--json` | Output in JSON format | `false` |
+| `--port` | Port to listen on | `3000` |
+| `--no-open` | Don't open browser | `false` |
 
 ## 🧩 Configuration Management
 
@@ -161,155 +139,61 @@ lambda-run init [options]
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--force` | Overwrite existing config | `false` |
-| `--minimal` | Create minimal configuration | `false` |
-| `--template` | Configuration template to use | `default` |
+| `--force` | Overwrite existing files | `false` |
 
-## 📊 Logs and Monitoring
+The `init` command creates two files:
+- `lambda-running.json` - Configuration file for Lambda Running
+- `.lambdarunignore` - Patterns for files to ignore when scanning for handlers
 
-### Viewing Logs
-
+Example usage:
 ```bash
-lambda-run logs [options]
+# Create initial configuration files
+lambda-run init
+
+# Overwrite existing files
+lambda-run init --force
 ```
-
-### Log Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--id` | Execution ID to show logs for | |
-| `--tail` | Number of lines to show | `100` |
-| `--filter` | Filter logs by text | |
-| `--level` | Minimum log level to show | `info` |
-
-## 🔌 AWS Integration
-
-### Importing Events from AWS
-
-```bash
-lambda-run import [options] <event-name>
-```
-
-### Import Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--type` | Event type (apigateway, s3, etc.) | |
-| `--source` | Source in AWS to import from | |
-| `--profile` | AWS profile to use | |
-
-### Exporting a Handler for AWS
-
-```bash
-lambda-run export <handler-path> [handler-name] [options]
-```
-
-### Export Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--output` | Output directory | `./dist` |
-| `--include-layers` | Include Lambda layers | `false` |
-| `--minify` | Minify the output | `false` |
-| `--zip` | Create ZIP archive | `false` |
-
-## 🔧 Advanced Commands
-
-### Running with AWS Service Mocks
-
-```bash
-lambda-run <handler> --dynamodb-local --s3-local
-```
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--dynamodb-local` | Use local DynamoDB endpoint | `http://localhost:8000` |
-| `--s3-local` | Use local S3 endpoint | `http://localhost:9000` |
-| `--aws-endpoint` | Custom AWS service endpoint | |
-
-### Execution Profiling
-
-```bash
-lambda-run <handler> --profile
-```
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--profile` | Enable execution profiling | `false` |
-| `--profile-output` | File to save profile data | `lambda-profile.cpuprofile` |
-
-### Setting Environment Variables
-
-```bash
-lambda-run <handler> -v KEY1=value1 -v KEY2=value2
-```
-
-Multiple `-v` flags can be used to set multiple environment variables.
 
 ## 📃 Examples by Use Case
 
 ### Testing API Gateway Handlers
 
 ```bash
-# Test with API Gateway event
-lambda-run api-handler.js -i '{
-  "httpMethod": "GET",
-  "path": "/users",
-  "queryStringParameters": {"limit": "10"},
-  "headers": {"Authorization": "Bearer token"}
-}'
+# Test with an API Gateway event from a file
+lambda-run run api-handler.js handler -e api-event.json
+
+# Save the event for future use
+lambda-run run api-handler.js handler -e api-event.json -s api-get-request
 ```
 
-### Testing with Different Environments
+### Testing with Environment Variables
 
 ```bash
-# Development environment
-lambda-run handler.js --env-file .env.dev
+# Run with environment variables from .env file (default)
+lambda-run run handler.js handler
 
-# Production simulation
-lambda-run handler.js --env-file .env.prod
+# Run without loading environment variables
+lambda-run run handler.js handler --no-env
 ```
 
-### Debugging a Handler
+### Using Interactive Mode
 
 ```bash
-# Start with Node.js inspector enabled
-lambda-run handler.js --debug
-
-# More verbose logging
-lambda-run handler.js --verbose
+# Start interactive handler selection
+lambda-run interactive
 ```
 
-### Continuous Testing with Watch Mode
+### Using the UI
 
 ```bash
-# Auto-reload on changes
-lambda-run watch handler.js -e event.json
+# Start the web UI on the default port
+lambda-run ui
+
+# Start on a custom port
+lambda-run ui --port 8080
 ```
-
-### Generating a Deployment Package
-
-```bash
-# Export for AWS Lambda deployment
-lambda-run export handler.js --zip --include-layers
-```
-
-## 🛠️ Environment Variables
-
-Lambda Running respects the following environment variables:
-
-| Environment Variable | Description |
-|----------------------|-------------|
-| `LAMBDA_RUNNING_CONFIG` | Path to config file |
-| `LAMBDA_RUNNING_TIMEOUT` | Default function timeout |
-| `LAMBDA_RUNNING_MEMORY_SIZE` | Default function memory size |
-| `LAMBDA_RUNNING_AWS_REGION` | Default AWS region |
-| `LAMBDA_RUNNING_EVENT_DIR` | Directory for saved events |
-| `LAMBDA_RUNNING_UI_PORT` | Default UI server port |
-| `LAMBDA_RUNNING_VERBOSE` | Enable verbose logging |
 
 ## 🔍 Next Steps
 
 - [Read the Configuration Guide](../features/configuration.md)
-- [Explore Advanced Patterns](./advanced-patterns.md)
-- [Learn about the UI Mode](../features/ui-mode.md) 
+- [Explore Advanced Patterns](./advanced-patterns.md) 

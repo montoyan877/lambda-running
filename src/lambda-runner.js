@@ -82,6 +82,42 @@ if (!skipTsCheck) {
 }
 
 /**
+ * Parse JSON safely, with better error handling and support for common json errors
+ * like trailing commas and comments
+ * @param {string} jsonString - The JSON string to parse
+ * @param {string} filePath - File path for error reporting
+ * @returns {Object|null} - Parsed object or null if parsing failed
+ */
+function safeParseJson(jsonString, filePath) {
+  try {
+    // First try standard JSON parsing
+    return JSON.parse(jsonString);
+  } catch (initialError) {
+    console.warn(`Warning: Initial JSON parse error in ${filePath}: ${initialError.message}`);
+    console.log('Attempting to fix common JSON issues...');
+    
+    try {
+      // Fix common issues: 
+      // 1. Remove trailing commas (very common in tsconfig.json)
+      const fixedJson = jsonString
+        // Remove comments
+        .replace(/\/\/.*$/gm, '')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        // Fix trailing commas in objects
+        .replace(/,(\s*[}\]])/g, '$1')
+        // Ensure all property names are double-quoted
+        .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?\s*:/g, '"$2": ');
+      
+      return JSON.parse(fixedJson);
+    } catch (fixedError) {
+      console.error(`Error: Failed to parse JSON after fixing in ${filePath}: ${fixedError.message}`);
+      console.error('Consider validating your JSON with a linter or online tool');
+      return null;
+    }
+  }
+}
+
+/**
  * Read and parse .lambdarunignore file in the specified directory
  * @param {string} directory - Directory to look for .lambdarunignore
  * @returns {Array<string>} - Array of patterns to ignore

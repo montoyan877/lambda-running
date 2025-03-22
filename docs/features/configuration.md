@@ -2,40 +2,29 @@
 
 This guide explains how to configure Lambda Running to customize its behavior for your specific needs.
 
-## 🔧 Configuration File
+## 🔧 Configuration
 
-Lambda Running uses a JSON configuration file (`lambda-running.json`) to customize its behavior. This file can be placed in your project root directory or specified using the `--config` option.
+Lambda Running offers several ways to configure how it works with your Lambda functions and layers, allowing for customization to fit your project's needs.
 
-### Creating a Configuration File
+## Configuration Files
 
-To create a default configuration file, run:
+### lambda-running.json
+
+The main configuration file for Lambda Running is `lambda-running.json`, which should be placed in your project's root directory.
+
+You can generate this file automatically with:
 
 ```bash
 lambda-run init
 ```
 
-This creates a `lambda-running.json` file in the current directory with default settings.
-
-### Example Configuration
-
-Here's a complete example of a `lambda-running.json` file:
+Or create it manually with the following structure:
 
 ```json
 {
-  "layers": [
-    "my-common-layer",
-    "my-utils-layer"
-  ],
-  "layerMappings": {
-    "/opt/nodejs/my-common-layer": "./layers/my-common-layer",
-    "/opt/nodejs/aws-sdk": "./node_modules/aws-sdk",
-    "/opt/nodejs/axios": "./node_modules/axios"
-  },
-  "envFiles": [
-    ".env",
-    ".env.local",
-    ".env.test"
-  ],
+  "layers": [],
+  "layerMappings": {},
+  "envFiles": [".env"],
   "ignorePatterns": [
     "**/*.test.js",
     "**/*.spec.js",
@@ -43,6 +32,112 @@ Here's a complete example of a `lambda-running.json` file:
   ],
   "ignoreLayerFilesOnScan": true,
   "debug": false
+}
+```
+
+### .lambdarunignore
+
+The `.lambdarunignore` file allows you to specify patterns for files and directories that should be ignored when scanning for Lambda handlers. It works similar to `.gitignore`.
+
+You can generate this file automatically with:
+
+```bash
+lambda-run init
+```
+
+#### Pattern Format
+
+- Simple directory or file names: `node_modules`, `dist`, `coverage`
+- Glob patterns: `**/*.test.js`, `*.config.js`
+- Comments: Lines starting with `#` are ignored
+
+#### Example .lambdarunignore file
+
+```
+# Dependencies
+node_modules
+package-lock.json
+
+# Tests
+tests
+**/*.test.js
+**/__tests__
+
+# Build output
+dist
+build
+coverage
+```
+
+> **Note:** When listing directories, don't include trailing slashes. Use `coverage` instead of `coverage/` for better compatibility.
+
+## Configuration Options
+
+### Layers
+
+The `layers` array defines Lambda layers to be resolved. Each entry should be the name of a layer which will be mapped to a local directory.
+
+```json
+{
+  "layers": ["my-common-layer", "my-utils-layer"]
+}
+```
+
+With this configuration, Lambda Running will:
+- Look for these layers in the `layers/` directory of your project
+- Map imports like `/opt/nodejs/my-common-layer` to `./layers/my-common-layer`
+
+### Layer Mappings
+
+For more specific layer mappings, use the `layerMappings` object:
+
+```json
+{
+  "layerMappings": {
+    "/opt/nodejs/custom-path": "./local/path/to/layer",
+    "my-layer": "./src/layers/my-layer"
+  }
+}
+```
+
+This configuration allows you to:
+- Map any path starting with `/opt/nodejs/custom-path` to `./local/path/to/layer`
+- Map imports like `/opt/nodejs/my-layer` to `./src/layers/my-layer`
+
+### Environment Files
+
+Specify which environment files to load:
+
+```json
+{
+  "envFiles": [".env", ".env.local"]
+}
+```
+
+Lambda Running will load each file in order, with later files overriding variables from earlier ones.
+
+### Ignore Patterns
+
+Specify patterns for files to ignore when scanning for handlers:
+
+```json
+{
+  "ignorePatterns": [
+    "**/*.test.js",
+    "**/*.spec.js",
+    "**/__tests__/**",
+    "dist/**"
+  ]
+}
+```
+
+### Debug Mode
+
+Enable debug mode for more verbose logging:
+
+```json
+{
+  "debug": true
 }
 ```
 
