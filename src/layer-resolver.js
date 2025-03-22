@@ -17,6 +17,7 @@ const originalResolveFilename = Module._resolveFilename;
 function initializeLayerResolver(config) {
   // Guard to ensure we have a configuration
   if (!config) {
+    // Only log in debug mode or for critical errors
     console.warn('[SYSTEM] No configuration provided to layer resolver');
     return;
   }
@@ -66,6 +67,7 @@ function initializeLayerResolver(config) {
             // Only add if there's no explicit mapping already
             if (!mappings[moduleLayerPath]) {
               mappings[moduleLayerPath] = moduleLocalPath;
+              // Only log in debug mode
               if (debug) {
                 console.log(`[SYSTEM] Added AWS module mapping: ${moduleLayerPath} -> ${moduleLocalPath}`);
               }
@@ -79,6 +81,7 @@ function initializeLayerResolver(config) {
         }
       }
       
+      // Only log in debug mode
       if (debug) {
         console.log(`[SYSTEM] Processing layer from config: ${layer} -> ${localPath}`);
       }
@@ -107,7 +110,7 @@ function initializeLayerResolver(config) {
     }
   }
   
-  // If no mappings were configured, but debug is not enabled, don't show warning
+  // If no mappings were configured, only warn in debug mode
   if (Object.keys(mappings).length === 0) {
     if (debug) {
       console.warn('[SYSTEM] No layer mappings found in configuration. Layer resolution may not work.');
@@ -115,6 +118,7 @@ function initializeLayerResolver(config) {
     return;
   }
 
+  // Only log in debug mode
   if (debug) {
     console.log('[SYSTEM] Layer resolver initialized with mappings');
   }
@@ -131,6 +135,7 @@ function initializeLayerResolver(config) {
         // Create the directory if it doesn't exist
         fs.mkdirSync(localPath, { recursive: true });
       } catch (error) {
+        // This is a critical error, so log it regardless of debug mode
         console.error(`[SYSTEM] Error creating layer directory: ${error.message}`);
       }
     }
@@ -138,6 +143,7 @@ function initializeLayerResolver(config) {
   
   // Override Module._resolveFilename to intercept requires for layer paths
   Module._resolveFilename = function(request, parent, isMain, options) {
+    // Only log in debug mode
     if (debug) {
       console.log(`[SYSTEM] Layer resolver intercepted request: ${request}`);
     }
@@ -148,6 +154,7 @@ function initializeLayerResolver(config) {
         // Replace the layer path with the local path
         const localRequest = request.replace(layerPath, localPath);
         
+        // Only log in debug mode
         if (debug) {
           console.log(`[SYSTEM] Layer resolver direct mapping: ${request} -> ${localRequest}`);
         }
@@ -155,6 +162,7 @@ function initializeLayerResolver(config) {
         try {
           return originalResolveFilename.call(this, localRequest, parent, isMain, options);
         } catch (error) {
+          // Only log in debug mode
           if (debug) {
             console.error(`[SYSTEM] Layer resolver error for ${localRequest}: ${error.message}`);
           }
@@ -356,6 +364,7 @@ function findAwsStylePaths(baseDir, moduleName, debug = false) {
         const modulePath = path.join(nodejsPath, moduleName);
         if (fs.existsSync(modulePath)) {
           foundPaths.push(modulePath);
+          // Only log in debug mode
           if (debug) {
             console.log(`[SYSTEM] Found AWS-style module: ${modulePath}`);
           }
@@ -364,6 +373,7 @@ function findAwsStylePaths(baseDir, moduleName, debug = false) {
     }
   } catch (error) {
     // Ignore errors when searching
+    // Only log in debug mode
     if (debug) {
       console.error(`[SYSTEM] Error searching for AWS-style paths: ${error.message}`);
     }

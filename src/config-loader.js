@@ -54,10 +54,22 @@ function findConfigFile(startDir) {
 
 /**
  * Log a message using global.systemLog if available, otherwise console.log
+ * Only logs in debug mode unless it's an error or explicitly marked as important
  * @param {string} message - Message to log
  * @param {string} level - Log level (info, warn, error)
+ * @param {object} config - Configuration object with debug flag
+ * @param {boolean} isImportant - Whether to log regardless of debug mode
  */
-function logMessage(message, level = 'info') {
+function logMessage(message, level = 'info', config = null, isImportant = false) {
+  // Check debug mode - only log if we're in debug mode or it's an error or marked as important
+  const debugMode = config && config.debug;
+  const shouldLog = isImportant || level === 'error' || debugMode;
+  
+  if (!shouldLog) {
+    return; // Skip logging if not in debug mode
+  }
+  
+  // Use systemLog if available
   if (global.systemLog) {
     global.systemLog(message);
   } else if (level === 'error') {
@@ -80,7 +92,8 @@ function loadConfig(projectDir) {
   
   try {
     if (configPath) {
-      logMessage(`Found configuration at ${configPath}`, 'info');
+      // Finding configuration is important enough to always log
+      logMessage(`Found configuration at ${configPath}`, 'info', config, true);
       const configContent = fs.readFileSync(configPath, 'utf8');
       const userConfig = JSON.parse(configContent);
       
@@ -90,17 +103,15 @@ function loadConfig(projectDir) {
       // Store the directory where the config was found
       config._configDir = path.dirname(configPath);
       
-      if (config.debug) {
-        logMessage(`Configuration loaded from ${path.basename(configPath)}`, 'info');
-      }
+      // Only log in debug mode
+      logMessage(`Configuration loaded from ${path.basename(configPath)}`, 'info', config);
     } else {
       // Only log a warning if we're in debug mode
-      if (config.debug) {
-        logMessage('No lambda-running.json found, using default configuration', 'warn');
-      }
+      logMessage('No lambda-running.json found, using default configuration', 'warn', config);
     }
   } catch (error) {
-    logMessage(`Error loading configuration: ${error.message}`, 'error');
+    // Error loading config is important enough to always log
+    logMessage(`Error loading configuration: ${error.message}`, 'error', config, true);
     // Continue with default config
   }
   
@@ -141,16 +152,14 @@ function loadConfig(projectDir) {
         const awsStylePath = path.join(localLayerPath, 'nodejs');
         if (fs.existsSync(awsStylePath)) {
           localLayerPath = awsStylePath;
-          if (config.debug) {
-            logMessage(`Found AWS Lambda style layer structure for ${layer}`, 'info');
-          }
+          // Only log in debug mode
+          logMessage(`Found AWS Lambda style layer structure for ${layer}`, 'info', config);
         }
         
         config.layerMappings[layerPath] = localLayerPath;
         
-        if (config.debug) {
-          logMessage(`Added layer mapping for ${layer} -> ${localLayerPath}`, 'info');
-        }
+        // Only log in debug mode
+        logMessage(`Added layer mapping for ${layer} -> ${localLayerPath}`, 'info', config);
       }
     });
   }

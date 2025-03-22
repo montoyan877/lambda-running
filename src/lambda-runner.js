@@ -15,17 +15,25 @@ let lambdaRunningConfig = null;
 let tsNodeAvailable = false;
 let tsconfigPathsAvailable = false;
 
+// Registry of already configured TypeScript paths to avoid duplicate logs
+let configuredTsConfigPaths = new Set();
+
 // Skip TS check if environment variable is set (for development mode)
 const skipTsCheck = process.env.SKIP_TS_CHECK === 'true';
 
 /**
  * Sets up TypeScript support for the project
  * @param {string} [customConfigPath] - Optional path to a specific tsconfig.json file
+ * @param {boolean} [forceSetup=false] - Whether to force setup even if already configured
+ * @returns {boolean} - Whether setup was successful
  */
-function setupTypeScriptSupport(customConfigPath) {
+function setupTypeScriptSupport(customConfigPath, forceSetup = false) {
   if (skipTsCheck) {
-    console.log('Skipping TypeScript setup as SKIP_TS_CHECK is true');
-    return;
+    // Only log in debug mode
+    if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+      console.log('Skipping TypeScript setup as SKIP_TS_CHECK is true');
+    }
+    return false;
   }
 
   try {
@@ -37,12 +45,21 @@ function setupTypeScriptSupport(customConfigPath) {
       require.resolve('tsconfig-paths');
       tsconfigPathsAvailable = true;
     } catch (err) {
+      // This is important info for users, so we don't limit to debug
       console.warn('Path aliases not supported. Install tsconfig-paths if needed.');
       tsconfigPathsAvailable = false;
     }
 
     // Look for project's tsconfig.json
     const projectTsConfigPath = customConfigPath || path.join(process.cwd(), 'tsconfig.json');
+    
+    // Check if we've already configured this tsconfig
+    const normalizedPath = path.normalize(projectTsConfigPath);
+    if (!forceSetup && configuredTsConfigPaths.has(normalizedPath)) {
+      // Already configured, skip duplicate setup and logs
+      return true;
+    }
+    
     let tsNodeOptions = {
       transpileOnly: true,
       compilerOptions: {
@@ -54,35 +71,59 @@ function setupTypeScriptSupport(customConfigPath) {
     // If project has a tsconfig.json, use it instead of default options
     if (fs.existsSync(projectTsConfigPath)) {
       const chalk = require('chalk');
-      console.log(chalk.green(`Using TypeScript configuration from ${projectTsConfigPath}`));
+      // This is important info, but we'll use global.systemLog to respect debug mode
+      if (global.systemLog) {
+        global.systemLog(`Using TypeScript configuration from ${projectTsConfigPath}`);
+      } else if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+        console.log(`Using TypeScript configuration from ${projectTsConfigPath}`);
+      }
+      
       // ts-node will automatically pick up the tsconfig.json from the project root
       // We still set transpileOnly for better performance
       tsNodeOptions = { transpileOnly: true };
 
       // Register tsconfig-paths if available to support path aliases
       if (tsconfigPathsAvailable) {
-        setupTsConfigPaths(projectTsConfigPath);
+        setupTsConfigPaths(projectTsConfigPath, forceSetup);
+      } else {
+        // Still add to configured paths registry to avoid duplicate logs
+        configuredTsConfigPaths.add(normalizedPath);
       }
     } else {
-      console.log('No tsconfig.json found, using default TypeScript configuration');
+      // Only log in debug mode
+      if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+        console.log('No tsconfig.json found, using default TypeScript configuration');
+      }
     }
 
     // Register ts-node to import .ts files
     require('ts-node').register(tsNodeOptions);
+    return true;
   } catch (err) {
     // ts-node is not installed, continue without it
+    // This is an important warning, so we don't limit to debug
     console.warn(`ts-node not found: ${err.message}`);
+    return false;
   }
 }
 
 /**
  * Sets up TypeScript path aliases from tsconfig.json
  * @param {string} tsconfigPath - Path to the tsconfig.json file
+ * @param {boolean} [forceSetup=false] - Whether to force setup even if already configured
+ * @returns {boolean} - Whether setup was successful
  */
-function setupTsConfigPaths(tsconfigPath) {
-  if (!tsconfigPathsAvailable) return;
+function setupTsConfigPaths(tsconfigPath, forceSetup = false) {
+  if (!tsconfigPathsAvailable) return false;
   
   try {
+    // Check if we've already configured this tsconfig
+    const normalizedPath = path.normalize(tsconfigPath);
+    if (!forceSetup && configuredTsConfigPaths.has(normalizedPath)) {
+      // Already configured, skip duplicate setup and logs
+      return true;
+    }
+    
     // Read the tsconfig.json file content
     const tsconfigContent = fs.readFileSync(tsconfigPath, 'utf8');
     
@@ -101,9 +142,10 @@ function setupTsConfigPaths(tsconfigPath) {
     try {
       tsconfig = JSON.parse(fixedJson);
     } catch (parseError) {
+      // Error parsing is important, so we don't limit to debug
       console.error(`Error parsing tsconfig.json at ${tsconfigPath}: ${parseError.message}`);
       console.error('Please check your tsconfig.json for syntax errors');
-      return;
+      return false;
     }
     
     if (tsconfig && tsconfig.compilerOptions && tsconfig.compilerOptions.paths) {
@@ -115,7 +157,12 @@ function setupTsConfigPaths(tsconfigPath) {
         ? path.resolve(tsconfigDir, tsconfig.compilerOptions.baseUrl)
         : tsconfigDir;
       
-      console.log(`Registering TypeScript paths with baseUrl: ${baseUrl}`);
+      // Use global.systemLog to respect debug mode
+      if (global.systemLog) {
+        global.systemLog(`Registering TypeScript paths with baseUrl: ${baseUrl}`);
+      } else if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+        console.log(`Registering TypeScript paths with baseUrl: ${baseUrl}`);
+      }
       
       // Register tsconfig-paths with the correct baseUrl
       require('tsconfig-paths').register({
@@ -123,12 +170,33 @@ function setupTsConfigPaths(tsconfigPath) {
         paths: tsconfig.compilerOptions.paths
       });
       
-      console.log('TypeScript path aliases registered successfully');
+      // Add to configured paths registry
+      configuredTsConfigPaths.add(normalizedPath);
+      
+      // Use global.systemLog to respect debug mode
+      if (global.systemLog) {
+        global.systemLog('TypeScript path aliases registered successfully');
+      } else if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+        console.log('TypeScript path aliases registered successfully');
+      }
+      
+      return true;
     } else {
-      console.log('No path aliases found in tsconfig.json');
+      // Use global.systemLog to respect debug mode
+      if (global.systemLog) {
+        global.systemLog('No path aliases found in tsconfig.json');
+      } else if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+        console.log('No path aliases found in tsconfig.json');
+      }
+      
+      // Add to configured paths registry anyway to avoid duplicate checks
+      configuredTsConfigPaths.add(normalizedPath);
+      return false;
     }
   } catch (e) {
+    // This warning is important, so we don't limit to debug
     console.warn(`Error setting up TypeScript path aliases: ${e.message}`);
+    return false;
   }
 }
 
@@ -147,8 +215,11 @@ function safeParseJson(jsonString, filePath) {
     // First try standard JSON parsing
     return JSON.parse(jsonString);
   } catch (initialError) {
-    console.warn(`Warning: Initial JSON parse error in ${filePath}: ${initialError.message}`);
-    console.log('Attempting to fix common JSON issues...');
+    // Only log in debug mode - except for critical errors
+    if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+      console.warn(`Warning: Initial JSON parse error in ${filePath}: ${initialError.message}`);
+      console.log('Attempting to fix common JSON issues...');
+    }
     
     try {
       // Fix common issues: 
@@ -164,6 +235,7 @@ function safeParseJson(jsonString, filePath) {
       
       return JSON.parse(fixedJson);
     } catch (fixedError) {
+      // These are critical errors, so we show them regardless of debug mode
       console.error(`Error: Failed to parse JSON after fixing in ${filePath}: ${fixedError.message}`);
       console.error('Consider validating your JSON with a linter or online tool');
       return null;
@@ -192,7 +264,10 @@ function readIgnoreFile(directory) {
       ignorePatterns.push(...lines);
     }
   } catch (error) {
-    console.warn('Could not read .lambdarunignore file:', error.message);
+    // Only log in debug mode
+    if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+      console.warn('Could not read .lambdarunignore file:', error.message);
+    }
   }
 
   return ignorePatterns;
@@ -287,14 +362,17 @@ function loadEnvFile(directory, envFile = '.env') {
         }
       });
 
+      // This information is only meaningful in debug mode
       global.systemLog(`Loading environment variables from ${dotenvPath}`);
     } else {
       // Env file doesn't exist, but that's okay - just continue without it
       if (envFile === '.env') {
+        // This information is only meaningful in debug mode
         global.systemLog('No .env file found, continuing without it');
       }
     }
   } catch (error) {
+    // This is an error, but still only meaningful in debug mode
     global.systemLog(`Error loading ${envFile}: ${error.message}`);
   }
 
@@ -309,8 +387,12 @@ function setupGlobalLogging() {
   };
 
   // Global function to print system logs (which will be filtered and won't appear in the Output)
+  // Only log if debug mode is enabled in the config
   global.systemLog = (...args) => {
-    console.info(`[SYSTEM] ${args.join(' ')}`);
+    // Only show system logs in debug mode
+    if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+      console.info(`[SYSTEM] ${args.join(' ')}`);
+    }
   };
 }
 
@@ -381,11 +463,10 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
       }
       
       // Now set up TypeScript with the found tsconfig
+      // Force setup to ensure the configuration for this specific handler is used
       if (fs.existsSync(dirTsConfigPath)) {
-        global.systemLog(`Using TypeScript configuration from ${dirTsConfigPath}`);
-        // Set up TypeScript with the appropriate tsconfig
-        setupTypeScriptSupport(dirTsConfigPath);
-        tsconfigPathsRegistered = true;
+        // For handler execution, we'll always force setup to ensure correct config is used
+        tsconfigPathsRegistered = setupTypeScriptSupport(dirTsConfigPath, true);
       }
     }
 
@@ -454,20 +535,12 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
     // Execute the handler
     return await handler[handlerMethod](event, defaultContext);
   } catch (error) {
+    // Handler execution errors are important, so we show them regardless of debug mode
     console.error('Error executing handler:', error);
     throw error;
   } finally {
     // Restore the original module resolver
     restoreOriginalResolver();
-    
-    // If we set up TypeScript paths, we should re-register the project root tsconfig
-    // to restore the project's default TypeScript settings
-    if (tsconfigPathsRegistered) {
-      const projectTsConfig = path.join(process.cwd(), 'tsconfig.json');
-      if (fs.existsSync(projectTsConfig)) {
-        setupTypeScriptSupport(projectTsConfig);
-      }
-    }
   }
 }
 
@@ -558,9 +631,11 @@ function scanDirectory(directory, extensions, ignorePatterns) {
       // Skip files/directories that match ignore patterns
       if (shouldIgnore(filePath, ignorePatterns)) {
         if (lambdaRunningConfig && lambdaRunningConfig.debug) {
-          global.systemLog
-            ? global.systemLog(`Ignoring file due to pattern match: ${filePath}`)
-            : console.log(`Ignoring file due to pattern match: ${filePath}`);
+          if (global.systemLog) {
+            global.systemLog(`Ignoring file due to pattern match: ${filePath}`);
+          } else {
+            console.log(`Ignoring file due to pattern match: ${filePath}`);
+          }
         }
         continue;
       }
@@ -578,9 +653,13 @@ function scanDirectory(directory, extensions, ignorePatterns) {
             // Check if it's a TypeScript file and ts-node is not available
             const isTypeScript = ext === '.ts';
             if (isTypeScript && !tsNodeAvailable) {
-              global.systemLog
-                ? global.systemLog(`Skipping TypeScript file (ts-node not available): ${filePath}`)
-                : console.warn(`Skipping TypeScript file (ts-node not available): ${filePath}`);
+              if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+                if (global.systemLog) {
+                  global.systemLog(`Skipping TypeScript file (ts-node not available): ${filePath}`);
+                } else {
+                  console.warn(`Skipping TypeScript file (ts-node not available): ${filePath}`);
+                }
+              }
               continue;
             }
 
@@ -616,13 +695,10 @@ function scanDirectory(directory, extensions, ignorePatterns) {
                 }
               }
               
-              // Set up TypeScript paths if a tsconfig was found
+              // Set up TypeScript paths if a tsconfig was found, but only if not already configured
               if (tsconfigPath) {
-                if (lambdaRunningConfig && lambdaRunningConfig.debug) {
-                  global.systemLog(`Using TypeScript configuration from ${tsconfigPath} for ${filePath}`);
-                }
-                setupTypeScriptSupport(tsconfigPath);
-                tsPathsRegistered = true;
+                // Don't log again if already configured - use the improved function with registry
+                tsPathsRegistered = setupTypeScriptSupport(tsconfigPath, false);
               }
             }
             
@@ -638,14 +714,6 @@ function scanDirectory(directory, extensions, ignorePatterns) {
             // Restore original resolver right after require
             restoreOriginalResolver();
             
-            // If we registered TypeScript paths, restore the project's default TypeScript settings
-            if (tsPathsRegistered) {
-              const projectTsConfig = path.join(process.cwd(), 'tsconfig.json');
-              if (fs.existsSync(projectTsConfig)) {
-                setupTypeScriptSupport(projectTsConfig);
-              }
-            }
-
             // Only get methods named 'handler'
             const methods = Object.keys(handler).filter(
               (key) => typeof handler[key] === 'function' && key === 'handler'
@@ -654,9 +722,11 @@ function scanDirectory(directory, extensions, ignorePatterns) {
             if (methods.length > 0) {
               // This is a valid handler file
               if (lambdaRunningConfig && lambdaRunningConfig.debug) {
-                global.systemLog
-                  ? global.systemLog(`Found handler: ${filePath} with methods: ${methods.join(', ')}`)
-                  : console.log(`Found handler: ${filePath} with methods: ${methods.join(', ')}`);
+                if (global.systemLog) {
+                  global.systemLog(`Found handler: ${filePath} with methods: ${methods.join(', ')}`);
+                } else {
+                  console.log(`Found handler: ${filePath} with methods: ${methods.join(', ')}`);
+                }
               }
 
               results.push({
@@ -679,10 +749,12 @@ function scanDirectory(directory, extensions, ignorePatterns) {
 
             if (isHandlerWithLayerImport) {
               // This is likely a handler that uses layers
-              if (lambdaRunningConfig.debug) {
-                global.systemLog
-                  ? global.systemLog(`Found handler with layer imports: ${filePath} (will be available at runtime)`)
-                  : console.log(`Found handler with layer imports: ${filePath} (will be available at runtime)`);
+              if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+                if (global.systemLog) {
+                  global.systemLog(`Found handler with layer imports: ${filePath} (will be available at runtime)`);
+                } else {
+                  console.log(`Found handler with layer imports: ${filePath} (will be available at runtime)`);
+                }
               }
 
               results.push({
@@ -694,23 +766,34 @@ function scanDirectory(directory, extensions, ignorePatterns) {
               error.message.includes('Cannot find module \'/opt/nodejs/')
             ) {
               // This is likely a layer file that imports from other layers
-              global.systemLog
-                ? global.systemLog(`Skipping layer file (imports from other layers): ${filePath}`)
-                : console.warn(`Skipping layer file (imports from other layers): ${filePath}`);
+              if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+                if (global.systemLog) {
+                  global.systemLog(`Skipping layer file (imports from other layers): ${filePath}`);
+                } else {
+                  console.warn(`Skipping layer file (imports from other layers): ${filePath}`);
+                }
+              }
             } else {
               // For better TypeScript path resolution issues diagnostics, add more details for this type of error
               const isTypeScriptFile = path.extname(filePath) === '.ts';
               if (error.message && error.message.includes('Cannot find module') && isTypeScriptFile) {
-                global.systemLog
-                  ? global.systemLog(`TypeScript module resolution error in ${filePath}: ${error.message}
-Try configuring tsconfig.json paths or check import paths`)
-                  : console.warn(`TypeScript module resolution error in ${filePath}: ${error.message}
+                // TypeScript module errors are important, so we show these regardless of debug
+                if (global.systemLog) {
+                  global.systemLog(`TypeScript module resolution error in ${filePath}: ${error.message}
 Try configuring tsconfig.json paths or check import paths`);
+                } else {
+                  console.warn(`TypeScript module resolution error in ${filePath}: ${error.message}
+Try configuring tsconfig.json paths or check import paths`);
+                }
               } else {
-                // Log other errors
-                global.systemLog
-                  ? global.systemLog(`Could not load potential handler: ${filePath} - ${error.message}`)
-                  : console.warn(`Could not load potential handler: ${filePath}`, error.message);
+                // Log other errors but only in debug mode
+                if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+                  if (global.systemLog) {
+                    global.systemLog(`Could not load potential handler: ${filePath} - ${error.message}`);
+                  } else {
+                    console.warn(`Could not load potential handler: ${filePath}`, error.message);
+                  }
+                }
               }
             }
           }
@@ -718,9 +801,12 @@ Try configuring tsconfig.json paths or check import paths`);
       }
     }
   } catch (error) {
-    global.systemLog
-      ? global.systemLog(`Error scanning directory ${directory}: ${error.message}`)
-      : console.error(`Error scanning directory ${directory}:`, error);
+    // Directory scanning errors are important, show them regardless of debug mode
+    if (global.systemLog) {
+      global.systemLog(`Error scanning directory ${directory}: ${error.message}`);
+    } else {
+      console.error(`Error scanning directory ${directory}:`, error);
+    }
   }
 
   return results;
