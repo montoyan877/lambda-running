@@ -119,9 +119,9 @@ describe('Execution Store', () => {
     
     // Verify axios was called
     expect(axios.post).toHaveBeenCalledWith('/api/run', {
-      path: handlerPath,
-      method: handlerMethod,
-      event: eventData,
+      handlerPath,
+      handlerMethod,
+      eventData,
       sessionId
     });
   });
