@@ -380,6 +380,7 @@ export default defineComponent({
     const currentSessionId = ref(null);
     const showSaveEventModal = ref(false);
     const selectedEventLabel = ref(null);
+    const selectedEventData = ref(null);
     const forceJsonFormat = ref(false);
     const resultViewMode = computed(() => forceJsonFormat.value ? 'json' : 'string');
     const showPanelMenu = ref(false);
@@ -538,14 +539,24 @@ export default defineComponent({
                 if (template && JSON.stringify(template.data) !== JSON.stringify(currentEventData)) {
                   selectedEventLabel.value = null;
                 }
+              } else if (selectedEventData.value) {
+                // For saved events, compare with the stored event data
+                const savedDataStr = JSON.stringify(selectedEventData.value);
+                const currentDataStr = JSON.stringify(currentEventData);
+                
+                // Only clear the label if the data has actually changed
+                if (savedDataStr !== currentDataStr) {
+                  selectedEventLabel.value = null;
+                  selectedEventData.value = null;
+                }
               } else {
-                // For saved events, we don't have an easy way to compare, so just clear the label
-                // after user edits (this timeout provides a slight buffer)
+                // No stored data reference, traditional behavior
                 selectedEventLabel.value = null;
               }
             } catch (e) {
               // Invalid JSON, just clear the label
               selectedEventLabel.value = null;
+              selectedEventData.value = null;
             }
           }
         }, 500); // 500ms delay
@@ -731,6 +742,7 @@ export default defineComponent({
     const selectEvent = (event) => {
       eventData.value = JSON.stringify(event.data, null, 2);
       selectedEventLabel.value = event.name;
+      selectedEventData.value = JSON.parse(JSON.stringify(event.data));
     };
     
     const clearLogs = () => {
@@ -862,6 +874,7 @@ export default defineComponent({
     const applyAWSTemplate = (template) => {
       eventData.value = JSON.stringify(template.data, null, 2);
       selectedEventLabel.value = template.name;
+      selectedEventData.value = JSON.parse(JSON.stringify(template.data));
     };
     
     const togglePanelMenu = (event) => {
@@ -895,6 +908,7 @@ export default defineComponent({
       currentSessionId,
       showSaveEventModal,
       selectedEventLabel,
+      selectedEventData,
       forceJsonFormat,
       resultViewMode,
       
