@@ -156,6 +156,17 @@ export default defineComponent({
       return result;
     });
     
+    // Handle clicks outside the dropdown
+    const handleClickOutside = (event) => {
+      if (isActive.value &&
+          dropdownButton.value && 
+          dropdownMenu.value && 
+          !dropdownButton.value.contains(event.target) && 
+          !dropdownMenu.value.contains(event.target)) {
+        emit('dropdown-closed');
+      }
+    };
+    
     // Calculate and set dropdown position
     const updateDropdownPosition = () => {
       nextTick(() => {
@@ -209,14 +220,16 @@ export default defineComponent({
       }
     });
     
-    // Add resize listener when component is mounted
+    // Add resize and click listeners when component is mounted
     onMounted(() => {
       window.addEventListener('resize', handleResize);
+      document.addEventListener('mousedown', handleClickOutside);
     });
     
-    // Clean up listener when component is unmounted
+    // Clean up listeners when component is unmounted
     onBeforeUnmount(() => {
       window.removeEventListener('resize', handleResize);
+      document.removeEventListener('mousedown', handleClickOutside);
     });
     
     // Handle event selection
