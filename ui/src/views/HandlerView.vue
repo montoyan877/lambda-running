@@ -23,8 +23,8 @@
               <span>Output Panels</span>
             </button>
             
-            <div v-if="showPanelMenu" class="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-dark-200 ring-1 ring-black ring-opacity-5 z-30">
-              <div class="py-1" role="menu" aria-orientation="vertical">
+            <div v-if="showPanelMenu" class="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-dark-200 ring-1 ring-black ring-opacity-5 z-50">
+              <div class="py-1 z-50" role="menu" aria-orientation="vertical">
                 <div class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-dark-border">
                   <p class="font-medium">Show/Hide Output Panels</p>
                 </div>
@@ -92,7 +92,7 @@
           <div class="p-3 border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-100 flex justify-between items-center">
             <div class="flex items-center gap-2">
               <h2 class="font-medium">Event Data</h2>
-              <span v-if="selectedEventLabel" class="text-xs px-2 py-0.5 rounded-full bg-gray-200 dark:bg-dark-300 text-gray-700 dark:text-gray-300">
+              <span v-if="selectedEventLabel" class="text-xs px-2 py-0.5 rounded-full bg-gray-200 dark:bg-dark-300 text-gray-700 dark:text-gray-300 truncate max-w-[200px]" :title="selectedEventLabel">
                 {{ selectedEventLabel }}
               </span>
             </div>

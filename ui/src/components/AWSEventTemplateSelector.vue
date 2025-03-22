@@ -37,7 +37,7 @@
                 class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-dark-hover transition-colors flex items-center gap-2"
               >
                 <!-- Template Icon -->
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" :class="template.icon?.color || 'text-orange-400'" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" :class="template.icon?.color || 'text-orange-400'" viewBox="0 0 20 20" fill="currentColor">
                   <path v-if="template.icon?.path" fill-rule="evenodd" :d="template.icon.path" clip-rule="evenodd" />
                   <template v-else-if="template.icon?.paths">
                     <path v-for="(path, index) in template.icon.paths" :key="index" :d="path" :fill-rule="index === 1 ? 'evenodd' : undefined" :clip-rule="index === 1 ? 'evenodd' : undefined" />
@@ -46,9 +46,9 @@
                   <path v-if="!template.icon?.path && !template.icon?.paths" fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
                 </svg>
                 
-                <span>
-                  {{ template.name }}
-                </span>
+                <div class="flex-1 min-w-0">
+                  <div class="truncate" :title="template.name">{{ template.name }}</div>
+                </div>
               </button>
             </template>
             
@@ -63,7 +63,7 @@
     <!-- Modal for confirmation -->
     <div v-if="showConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 z-[200] flex items-center justify-center p-4">
       <div class="bg-white dark:bg-dark-100 rounded-lg shadow-xl max-w-md w-full p-4">
-        <h3 class="text-lg font-medium mb-2">Replace Event Data?</h3>
+        <h3 class="text-lg font-medium mb-2 truncate" :title="'Replace Event Data?'">Replace Event Data?</h3>
         <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">
           This will replace your current event data with the selected template. Are you sure you want to continue?
         </p>
