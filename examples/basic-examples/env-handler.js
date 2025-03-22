@@ -35,7 +35,6 @@ exports.handler = async (event, context) => {
     },
   };
 
-  // Return environment info
   return {
     statusCode: 200,
     body: JSON.stringify(
@@ -43,39 +42,6 @@ exports.handler = async (event, context) => {
         message: 'Environment information retrieved successfully',
         environment,
         event,
-      },
-      null,
-      2
-    ),
-  };
-};
-
-// Handler that processes environment-dependent configuration
-exports.processWithEnv = async (event, context) => {
-  // Use environment variables to configure behavior
-  const region = process.env.AWS_REGION || 'us-east-1';
-  const apiEndpoint = process.env.API_ENDPOINT || 'https://default-api.example.com';
-  const isDebug = process.env.APP_DEBUG === 'true';
-
-  // Log debugging info if in debug mode
-  if (isDebug) {
-    console.log('Debug mode enabled');
-    console.log('Request event:', event);
-    console.log('Lambda context:', context);
-  }
-
-  // Simulate processing based on environment configuration
-  return {
-    statusCode: 200,
-    body: JSON.stringify(
-      {
-        message: 'Processing completed with environment configuration',
-        config: {
-          region,
-          apiEndpoint,
-          isDebug,
-        },
-        input: event,
       },
       null,
       2
