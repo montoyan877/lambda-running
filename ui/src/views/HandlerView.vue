@@ -52,6 +52,8 @@
             <h2 class="font-medium">Event Data</h2>
             
             <div class="flex space-x-2 items-center">
+              <AWSEventTemplateSelector @select-template="applyAWSTemplate" />
+              
               <button 
                 v-if="showSavedEvents"
                 class="text-xs px-2 py-1 rounded bg-dark-hover hover:bg-dark-300 transition-colors"
@@ -64,7 +66,7 @@
                 class="text-xs px-2 py-1 rounded bg-dark-hover hover:bg-dark-300 transition-colors"
                 @click="showSavedEvents = true"
               >
-                Show Saved Events
+                Saved Events
               </button>
               
               <button 
@@ -210,6 +212,7 @@ import ResizablePanel from '../components/ResizablePanel.vue';
 import ResizablePanelVertical from '../components/ResizablePanelVertical.vue';
 import SaveEventModal from '../components/SaveEventModal.vue';
 import { notify } from '../components/Notification.vue';
+import AWSEventTemplateSelector from '../components/AWSEventTemplateSelector.vue';
 
 export default defineComponent({
   name: 'HandlerView',
@@ -219,7 +222,8 @@ export default defineComponent({
     Terminal,
     ResizablePanel,
     ResizablePanelVertical,
-    SaveEventModal
+    SaveEventModal,
+    AWSEventTemplateSelector
   },
   
   setup() {
@@ -560,6 +564,11 @@ export default defineComponent({
       return parts[parts.length - 1];
     };
     
+    const applyAWSTemplate = (template) => {
+      eventData.value = JSON.stringify(template.data, null, 2);
+      showSavedEvents.value = false;
+    };
+    
     return {
       // Refs
       eventEditor,
@@ -590,7 +599,8 @@ export default defineComponent({
       handleSaveEvent,
       formatDuration,
       formatResultOutput,
-      getRelativePath
+      getRelativePath,
+      applyAWSTemplate
     };
   }
 });
