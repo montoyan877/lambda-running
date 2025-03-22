@@ -13,8 +13,9 @@
         <div class="flex space-x-3">
           <div class="relative">
             <button 
-              class="btn btn-outline text-sm flex items-center"
+              class="btn btn-outline text-sm flex items-center panel-menu"
               @click="togglePanelMenu"
+              ref="panelMenuButton"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -23,8 +24,12 @@
               <span>Output Panels</span>
             </button>
             
-            <div v-if="showPanelMenu" class="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-dark-200 ring-1 ring-black ring-opacity-5 z-50">
-              <div class="py-1 z-50" role="menu" aria-orientation="vertical">
+            <div 
+              v-if="showPanelMenu" 
+              class="fixed w-56 rounded-md shadow-lg bg-white dark:bg-dark-200 ring-1 ring-black ring-opacity-5 z-[9999]"
+              :style="panelMenuPosition"
+            >
+              <div class="py-1 z-[9999]" role="menu" aria-orientation="vertical">
                 <div class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-dark-border">
                   <p class="font-medium">Show/Hide Output Panels</p>
                 </div>
@@ -390,9 +395,22 @@ export default defineComponent({
     const showResultPanel = ref(true);
     const awsTemplateSelector = ref(null);
     const savedEventSelector = ref(null);
+    const panelMenuButton = ref(null);
+    const panelMenuPosition = ref({});
     
     // Track which dropdown is open to ensure only one at a time
     const activeDropdown = ref(null);
+    
+    // Handle window resize for panel menu positioning
+    const handleWindowResize = () => {
+      if (showPanelMenu.value && panelMenuButton.value) {
+        const buttonRect = panelMenuButton.value.getBoundingClientRect();
+        panelMenuPosition.value = {
+          top: `${buttonRect.bottom + 5}px`,
+          right: `${window.innerWidth - buttonRect.right}px`
+        };
+      }
+    };
     
     // On mount, initialize
     onMounted(() => {
@@ -430,6 +448,8 @@ export default defineComponent({
       window.addEventListener('keydown', handleKeydown);
       // Add click listener to close panel menu when clicking outside
       window.addEventListener('click', closePanelMenu);
+      // Add resize listener for panel menu positioning
+      window.addEventListener('resize', handleWindowResize);
 
       // Watch for theme changes
       const observer = new MutationObserver((mutations) => {
@@ -452,6 +472,7 @@ export default defineComponent({
     onBeforeUnmount(() => {
       window.removeEventListener('keydown', handleKeydown);
       window.removeEventListener('click', closePanelMenu);
+      window.removeEventListener('resize', handleWindowResize);
     });
     
     // Handle keydown events
@@ -881,12 +902,29 @@ export default defineComponent({
       selectedEventData.value = JSON.parse(JSON.stringify(template.data));
     };
     
-    const togglePanelMenu = () => {
+    const togglePanelMenu = (event) => {
+      if (event) {
+        event.stopPropagation();
+      }
       showPanelMenu.value = !showPanelMenu.value;
+      
+      // Calculate position for panel menu dropdown
+      if (showPanelMenu.value && panelMenuButton.value) {
+        nextTick(() => {
+          const buttonRect = panelMenuButton.value.getBoundingClientRect();
+          panelMenuPosition.value = {
+            top: `${buttonRect.bottom + 5}px`,
+            right: `${window.innerWidth - buttonRect.right}px`
+          };
+        });
+      }
     };
     
     const closePanelMenu = (event) => {
-      if (showPanelMenu.value && !event.target.closest('.panel-menu')) {
+      // Only close if clicking outside both the panel menu and its button
+      if (showPanelMenu.value && 
+          !event.target.closest('.panel-menu') && 
+          !event.target.closest('[role="menu"]')) {
         showPanelMenu.value = false;
       }
     };
@@ -927,6 +965,8 @@ export default defineComponent({
       resultViewMode,
       awsTemplateSelector,
       savedEventSelector,
+      panelMenuButton,
+      panelMenuPosition,
       
       // UI State
       sidebarCollapsed,
@@ -971,15 +1011,16 @@ export default defineComponent({
   @apply bg-red-500 hover:bg-red-600 text-white;
 }
 
-/* Fix dropdown z-index */
+/* All fixed dropdowns */
+.fixed {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  z-index: 9999 !important;
+}
+
+/* Regular dropdowns */
 .relative {
   position: relative;
   z-index: 20;
-}
-
-/* Panel menu dropdown styles */
-.absolute {
-  @apply transition-opacity duration-150;
 }
 
 /* Eye button styles */

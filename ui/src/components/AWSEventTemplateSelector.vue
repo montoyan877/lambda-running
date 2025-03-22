@@ -8,7 +8,8 @@
         class="inline-flex items-center gap-x-1 text-xs px-2 py-1 rounded bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-orange-400" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+          <path fill-rule="evenodd" d="M5.5 16a3.5 3.5 0 01-.59-6.95 5.002 5.002 0 019.804-1.05A4.5 4.5 0 0113 16H5.5z" clip-rule="evenodd" />
+          <path fill-rule="evenodd" d="M13 16h2.5a3.5 3.5 0 10-.732-6.935A5.002 5.002 0 0014.5 16H13z" clip-rule="evenodd" />
         </svg>
         <span>AWS Templates</span>
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
