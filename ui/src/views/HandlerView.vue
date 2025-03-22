@@ -85,7 +85,7 @@
     </header>
     
     <!-- Main Content -->
-    <ResizablePanel class="flex-1" :initialSplit="50">
+    <ResizablePanel class="flex-1" :initialSplit="50" @resize="handlePanelResize">
       <template #left>
         <!-- Event Editor -->
         <div class="h-full flex flex-col">
@@ -116,14 +116,16 @@
                   :activeDropdown="activeDropdown"
                   @dropdown-opened="handleDropdownOpen" 
                   @dropdown-closed="handleDropdownClose"
-                  @select-event="selectEvent" 
+                  @select-event="selectEvent"
+                  ref="savedEventSelector"
                 />
                 
                 <AWSEventTemplateSelector 
                   :activeDropdown="activeDropdown"
                   @dropdown-opened="handleDropdownOpen" 
                   @dropdown-closed="handleDropdownClose"
-                  @select-template="applyAWSTemplate" 
+                  @select-template="applyAWSTemplate"
+                  ref="awsTemplateSelector"
                 />
                 
                 <button 
@@ -330,7 +332,7 @@
 </template>
 
 <script>
-import { defineComponent, ref, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue';
+import { defineComponent, ref, computed, watch, onMounted, onBeforeUnmount, inject, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useHandlersStore } from '../stores/handlers';
 import { useEventsStore } from '../stores/events';
@@ -386,6 +388,8 @@ export default defineComponent({
     const showPanelMenu = ref(false);
     const showOutputPanel = ref(true);
     const showResultPanel = ref(true);
+    const awsTemplateSelector = ref(null);
+    const savedEventSelector = ref(null);
     
     // Track which dropdown is open to ensure only one at a time
     const activeDropdown = ref(null);
@@ -877,17 +881,14 @@ export default defineComponent({
       selectedEventData.value = JSON.parse(JSON.stringify(template.data));
     };
     
-    const togglePanelMenu = (event) => {
-      event.stopPropagation();
+    const togglePanelMenu = () => {
       showPanelMenu.value = !showPanelMenu.value;
-      // Close any open dropdowns when toggling panel menu
-      if (showPanelMenu.value && activeDropdown.value) {
-        activeDropdown.value = null;
-      }
     };
     
-    const closePanelMenu = () => {
-      showPanelMenu.value = false;
+    const closePanelMenu = (event) => {
+      if (showPanelMenu.value && !event.target.closest('.panel-menu')) {
+        showPanelMenu.value = false;
+      }
     };
     
     // Handle opening a dropdown component
@@ -898,6 +899,19 @@ export default defineComponent({
     // Handle closing a dropdown component
     const handleDropdownClose = () => {
       activeDropdown.value = null;
+    };
+    
+    // Handle panel resize event
+    const handlePanelResize = () => {
+      // If a dropdown is open, we need to update its position
+      if (activeDropdown.value) {
+        // Trigger position update in the active dropdown component
+        if (activeDropdown.value === 'aws-templates' && awsTemplateSelector.value) {
+          nextTick(() => awsTemplateSelector.value.updateDropdownPosition?.());
+        } else if (activeDropdown.value === 'saved-events' && savedEventSelector.value) {
+          nextTick(() => savedEventSelector.value.updateDropdownPosition?.());
+        }
+      }
     };
     
     return {
@@ -911,6 +925,8 @@ export default defineComponent({
       selectedEventData,
       forceJsonFormat,
       resultViewMode,
+      awsTemplateSelector,
+      savedEventSelector,
       
       // UI State
       sidebarCollapsed,
@@ -943,7 +959,8 @@ export default defineComponent({
       togglePanelMenu,
       closePanelMenu,
       handleDropdownOpen,
-      handleDropdownClose
+      handleDropdownClose,
+      handlePanelResize
     };
   }
 });
