@@ -442,6 +442,29 @@ export default defineComponent({
           eventData.value = JSON.stringify(lastEvent, null, 2);
           selectedEventLabel.value = lastEvent.name;
         }
+      } else {
+        // If we don't have a handler in the URL, select the first one
+        const groupedHandlers = handlersStore.groupedHandlers;
+        if (Object.keys(groupedHandlers).length > 0) {
+          const firstDirectory = Object.keys(groupedHandlers)[0];
+          if (firstDirectory && groupedHandlers[firstDirectory].length > 0) {
+            const firstHandler = groupedHandlers[firstDirectory][0];
+            
+            // Navigate to the first handler
+            router.replace(`/handlers/${encodeURIComponent(firstHandler.path)}/${firstHandler.method}`);
+            
+            // Set it as active
+            handlersStore.setActiveHandler(firstHandler.path, firstHandler.method);
+            
+            // Check if there's a last event for this handler and load it
+            const handlerId = `${firstHandler.path}:${firstHandler.method}`;
+            const lastEvent = handlerEventsStore.getLastEvent(handlerId);
+            if (lastEvent) {
+              eventData.value = JSON.stringify(lastEvent, null, 2);
+              selectedEventLabel.value = lastEvent.name;
+            }
+          }
+        }
       }
       
       // Add global event listener for Ctrl+Enter
