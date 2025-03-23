@@ -110,6 +110,10 @@ export default defineComponent({
     activeDropdown: {
       type: String,
       default: null
+    },
+    currentEventData: {
+      type: Object,
+      default: null
     }
   },
   
@@ -235,7 +239,20 @@ export default defineComponent({
     // Handle event selection
     const selectEvent = (event) => {
       selectedEvent.value = event;
-      showConfirmModal.value = true;
+      
+      // Get current event data from parent component
+      const currentEventData = JSON.stringify(props.currentEventData || {});
+      const isEmptyEvent = currentEventData === '{}' || currentEventData === '';
+      
+      if (isEmptyEvent) {
+        // If the current event is empty, directly emit the selection without confirmation
+        emit('select-event', selectedEvent.value);
+        selectedEvent.value = null;
+      } else {
+        // Otherwise, show confirmation modal
+        showConfirmModal.value = true;
+      }
+      
       emit('dropdown-closed');
     };
     

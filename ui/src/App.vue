@@ -6,7 +6,7 @@
       :class="{ 'w-64': !sidebarCollapsed, 'w-0 -ml-1 opacity-0': sidebarCollapsed }"
     >
       <!-- Logo and title -->
-      <div class="p-4 border-b border-gray-200 dark:border-dark-border flex flex-col">
+      <div class="p-4 border-b border-gray-200 dark:border-dark-border flex flex-col h-[73px]">
         <div class="flex justify-between items-center">
           <h1 class="text-xl font-bold text-primary-500">Lambda Running</h1>
           

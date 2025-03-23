@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col h-full">
     <!-- Header -->
-    <header class="p-4 border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-100">
+    <header class="p-4 border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-100 h-[73px]">
       <div class="flex items-center justify-between">
         <div :class="{ 'pl-6': sidebarCollapsed }">
           <h1 class="text-xl font-bold">Handler Testing</h1>
@@ -119,6 +119,7 @@
                 
                 <SavedEventSelector 
                   :activeDropdown="activeDropdown"
+                  :current-event-data="eventData ? JSON.parse(eventData) : {}"
                   @dropdown-opened="handleDropdownOpen" 
                   @dropdown-closed="handleDropdownClose"
                   @select-event="selectEvent"
