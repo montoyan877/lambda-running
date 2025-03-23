@@ -14,35 +14,7 @@ export default defineConfig(() => {
   return {
     plugins: [
       vue(),
-      // Custom plugin to remove all Monaco files after build
-      {
-        name: 'remove-monaco-files',
-        closeBundle: () => {
-          const assetsDir = path.join(outDir, 'assets');
-          if (fs.existsSync(assetsDir)) {
-            const files = fs.readdirSync(assetsDir);
-            files.forEach(file => {
-              // Remove any Monaco-related files
-              if (file.includes('monaco') || 
-                  file.includes('basic-languages') ||
-                  file.includes('editor.worker') ||
-                  file.includes('json.worker') ||
-                  file.includes('typescript') ||
-                  file.includes('abap') ||
-                  file.includes('apex') ||
-                  file.includes('azcli') ||
-                  file.includes('bat') ||
-                  file.includes('bicep') ||
-                  file.includes('cameligo') ||
-                  file.includes('clojure')) {
-                fs.unlinkSync(path.join(assetsDir, file));
-                console.log(`Removed: ${file}`);
-              }
-            });
-          }
-        }
-      },
-      // Custom plugin to correct asset paths in index.html after build
+      // Custom plugin to fix asset paths in index.html after build
       {
         name: 'fix-html-asset-paths',
         closeBundle: () => {
@@ -71,18 +43,13 @@ export default defineConfig(() => {
       rollupOptions: {
         input: path.resolve(__dirname, 'index.html'),
         external: [
-          'monaco-editor',
-          /monaco-editor\/.*/, // Exclude all Monaco modules
-          /vs\/.*/ // Exclude VS namespace modules
+          /monaco-editor\/.*/, // Mark monaco editor as external since we're loading from CDN
+          /vs\/.*/            // Exclude VS namespace modules
         ],
         output: {
           manualChunks(id) {
-            // Create a chunk for code editor (monaco)
-            if (id.includes('monaco')) {
-              return 'monaco';
-            }
             // Keep vue in the vendor chunk
-            if (id.includes('node_modules')) {
+            if (id.includes('node_modules') && !id.includes('monaco')) {
               return 'vendor';
             }
           }
