@@ -119,7 +119,7 @@
                 
                 <SavedEventSelector 
                   :activeDropdown="activeDropdown"
-                  :current-event-data="eventData ? JSON.parse(eventData) : {}"
+                  :current-event-data="getCurrentEventData()"
                   @dropdown-opened="handleDropdownOpen" 
                   @dropdown-closed="handleDropdownClose"
                   @select-event="selectEvent"
@@ -555,60 +555,14 @@ export default defineComponent({
     });
     
     // Watch for changes in the event data
-    // If the user modifies the event data, clear the selected event label
-    // Use a debounced watcher to not trigger immediately on template selection
-    let eventChangeTimeout = null;
+    // If the user modifies the event data, we'll keep the label until explicitly changed
     watch(eventData, (newValue, oldValue) => {
       if (newValue !== oldValue) {
-        // Clear any existing timeout
-        if (eventChangeTimeout) {
-          clearTimeout(eventChangeTimeout);
+        // Only clear the label if the value is empty or just whitespace
+        if (!newValue || !newValue.trim()) {
+          selectedEventLabel.value = null;
+          selectedEventData.value = null;
         }
-        
-        // Set a new timeout to clear the label after a short delay
-        // This prevents the label from being cleared when we programmatically set the event data
-        eventChangeTimeout = setTimeout(() => {
-          // Only clear if the data still doesn't match a template or saved event
-          if (selectedEventLabel.value) {
-            // Try to determine if this is a user edit or a programmatic change
-            try {
-              const currentEventData = JSON.parse(newValue);
-              
-              // Check if we're still showing a template
-              if (selectedEventLabel.value.includes('API Gateway') || 
-                  selectedEventLabel.value.includes('S3') ||
-                  selectedEventLabel.value.includes('DynamoDB') ||
-                  selectedEventLabel.value.includes('CloudFront') ||
-                  selectedEventLabel.value.includes('SNS') ||
-                  selectedEventLabel.value.includes('SQS') ||
-                  selectedEventLabel.value.includes('EventBridge')) {
-                
-                // Find the template
-                const template = AWS_EVENT_TEMPLATES.find(t => t.name === selectedEventLabel.value);
-                if (template && JSON.stringify(template.data) !== JSON.stringify(currentEventData)) {
-                  selectedEventLabel.value = null;
-                }
-              } else if (selectedEventData.value) {
-                // For saved events, compare with the stored event data
-                const savedDataStr = JSON.stringify(selectedEventData.value);
-                const currentDataStr = JSON.stringify(currentEventData);
-                
-                // Only clear the label if the data has actually changed
-                if (savedDataStr !== currentDataStr) {
-                  selectedEventLabel.value = null;
-                  selectedEventData.value = null;
-                }
-              } else {
-                // No stored data reference, traditional behavior
-                selectedEventLabel.value = null;
-              }
-            } catch (e) {
-              // Invalid JSON, just clear the label
-              selectedEventLabel.value = null;
-              selectedEventData.value = null;
-            }
-          }
-        }, 500); // 500ms delay
       }
     }, { deep: true });
     
@@ -976,6 +930,15 @@ export default defineComponent({
       }
     };
     
+    const getCurrentEventData = () => {
+      try {
+        if (!eventData.value) return {};
+        return JSON.parse(eventData.value);
+      } catch (e) {
+        return {};
+      }
+    };
+    
     return {
       // Refs
       eventEditor,
@@ -1024,7 +987,8 @@ export default defineComponent({
       closePanelMenu,
       handleDropdownOpen,
       handleDropdownClose,
-      handlePanelResize
+      handlePanelResize,
+      getCurrentEventData
     };
   }
 });
