@@ -3,11 +3,13 @@
     <div class="relative">
       <button 
         @click="toggleDropdown" 
-        type="button" 
+        type="button"
+        ref="dropdownButton"
         class="inline-flex items-center gap-x-1 text-xs px-2 py-1 rounded bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-orange-400" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+          <path fill-rule="evenodd" d="M5.5 16a3.5 3.5 0 01-.59-6.95 5.002 5.002 0 019.804-1.05A4.5 4.5 0 0113 16H5.5z" clip-rule="evenodd" />
+          <path fill-rule="evenodd" d="M13 16h2.5a3.5 3.5 0 10-.732-6.935A5.002 5.002 0 0014.5 16H13z" clip-rule="evenodd" />
         </svg>
         <span>AWS Templates</span>
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -17,8 +19,9 @@
       
       <div 
         v-if="isActive" 
-        class="absolute z-[100] mt-1 w-72 rounded-md shadow-lg bg-white dark:bg-dark-200 max-h-96 overflow-y-auto border border-gray-200 dark:border-dark-border"
-        style="left: 50%; transform: translateX(-50%);"
+        ref="dropdownMenu"
+        class="fixed mt-1 w-72 rounded-md shadow-lg bg-white dark:bg-dark-200 max-h-96 overflow-y-auto border border-gray-200 dark:border-dark-border"
+        :style="dropdownPosition"
       >
         <div class="rounded-md py-1">
           <div class="py-1 px-2">
@@ -87,7 +90,7 @@
 </template>
 
 <script>
-import { defineComponent, ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import { defineComponent, ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { AWS_EVENT_TEMPLATES } from '../utils/awsEventTemplates';
 
 export default defineComponent({
@@ -107,9 +110,51 @@ export default defineComponent({
     const searchQuery = ref('');
     const showConfirmModal = ref(false);
     const selectedTemplate = ref(null);
+    const dropdownButton = ref(null);
+    const dropdownMenu = ref(null);
+    const dropdownPosition = ref({});
     
     // Computed to check if this dropdown is active
     const isActive = computed(() => props.activeDropdown === DROPDOWN_NAME);
+    
+    // Handle clicks outside the dropdown
+    const handleClickOutside = (event) => {
+      if (isActive.value &&
+          dropdownButton.value && 
+          dropdownMenu.value && 
+          !dropdownButton.value.contains(event.target) && 
+          !dropdownMenu.value.contains(event.target)) {
+        emit('dropdown-closed');
+      }
+    };
+    
+    // Calculate and set dropdown position
+    const updateDropdownPosition = () => {
+      nextTick(() => {
+        if (dropdownButton.value && dropdownMenu.value) {
+          const buttonRect = dropdownButton.value.getBoundingClientRect();
+          const menuWidth = dropdownMenu.value.offsetWidth;
+          
+          // Center the dropdown under the button
+          const left = buttonRect.left + (buttonRect.width / 2) - (menuWidth / 2);
+          
+          // Ensure the dropdown doesn't go off-screen
+          const adjustedLeft = Math.max(10, Math.min(left, window.innerWidth - menuWidth - 10));
+          
+          dropdownPosition.value = {
+            top: `${buttonRect.bottom + 5}px`,
+            left: `${adjustedLeft}px`
+          };
+        }
+      });
+    };
+    
+    // Watch for window resize events to reposition dropdown
+    const handleResize = () => {
+      if (isActive.value) {
+        updateDropdownPosition();
+      }
+    };
     
     // Filter templates based on search query
     const filteredTemplates = computed(() => {
@@ -131,6 +176,8 @@ export default defineComponent({
       } else {
         emit('dropdown-opened', DROPDOWN_NAME);
         searchQuery.value = '';
+        // Position the dropdown
+        updateDropdownPosition();
       }
     };
     
@@ -139,7 +186,22 @@ export default defineComponent({
       if (newVal !== DROPDOWN_NAME) {
         // Reset search when dropdown is closed
         searchQuery.value = '';
+      } else {
+        // Update position when dropdown becomes active
+        updateDropdownPosition();
       }
+    });
+    
+    // Add resize and click listeners when component is mounted
+    onMounted(() => {
+      window.addEventListener('resize', handleResize);
+      document.addEventListener('mousedown', handleClickOutside);
+    });
+    
+    // Clean up listeners when component is unmounted
+    onBeforeUnmount(() => {
+      window.removeEventListener('resize', handleResize);
+      document.removeEventListener('mousedown', handleClickOutside);
     });
     
     // Handle template selection
@@ -165,7 +227,11 @@ export default defineComponent({
       showConfirmModal,
       toggleDropdown,
       selectTemplate,
-      confirmTemplateSelection
+      confirmTemplateSelection,
+      dropdownButton,
+      dropdownMenu,
+      dropdownPosition,
+      updateDropdownPosition
     };
   }
 });
@@ -175,6 +241,10 @@ export default defineComponent({
 /* Ensure dropdown appears above other content */
 .dropdown-container {
   position: relative;
-  z-index: 50;
+}
+
+/* Ensure the dropdown list itself has a very high z-index */
+.fixed {
+  z-index: 9999 !important;
 }
 </style> 

@@ -6,7 +6,7 @@
       :class="{ 'w-64': !sidebarCollapsed, 'w-0 -ml-1 opacity-0': sidebarCollapsed }"
     >
       <!-- Logo and title -->
-      <div class="p-4 border-b border-gray-200 dark:border-dark-border flex flex-col">
+      <div class="p-4 border-b border-gray-200 dark:border-dark-border flex flex-col h-[73px]">
         <div class="flex justify-between items-center">
           <h1 class="text-xl font-bold text-primary-500">Lambda Running</h1>
           
@@ -343,6 +343,26 @@ export default defineComponent({
             expandedDirectories.value[dir] = true // Default to expanded
           }
         })
+        
+        // Check if we need to select a default handler
+        // Only if we're on the main route with no handler selected
+        const currentRoute = router.currentRoute.value
+        if (currentRoute.name === 'HandlerView' && 
+            (!currentRoute.params.handlerPath || !currentRoute.params.handlerMethod)) {
+          // Find the first handler in the first directory
+          const firstDirectory = Object.keys(groupedHandlers)[0]
+          if (firstDirectory && groupedHandlers[firstDirectory].length > 0) {
+            const firstHandler = groupedHandlers[firstDirectory][0]
+            
+            // Navigate to the first handler
+            router.push(`/handlers/${encodeURIComponent(firstHandler.path)}/${firstHandler.method}`)
+            
+            // Set it as active
+            handlersStore.setActiveHandler(firstHandler.path, firstHandler.method)
+            
+            console.log(`Selected default handler: ${firstHandler.path} (${firstHandler.method})`)
+          }
+        }
       } catch (error) {
         console.error('Failed to load handlers:', error)
       } finally {

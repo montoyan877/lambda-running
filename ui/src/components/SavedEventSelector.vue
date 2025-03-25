@@ -3,7 +3,8 @@
     <div class="relative">
       <button 
         @click="toggleDropdown" 
-        type="button" 
+        type="button"
+        ref="dropdownButton"
         class="inline-flex items-center gap-x-1 text-xs px-2 py-1 rounded bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -17,8 +18,9 @@
       
       <div 
         v-if="isActive" 
-        class="absolute z-[100] mt-1 w-72 rounded-md shadow-lg bg-white dark:bg-dark-200 max-h-96 overflow-y-auto border border-gray-200 dark:border-dark-border"
-        style="left: 50%; transform: translateX(-50%);"
+        ref="dropdownMenu"
+        class="fixed mt-1 w-72 rounded-md shadow-lg bg-white dark:bg-dark-200 max-h-96 overflow-y-auto border border-gray-200 dark:border-dark-border"
+        :style="dropdownPosition"
       >
         <div class="rounded-md py-1">
           <div class="py-1 px-2">
@@ -98,7 +100,7 @@
 </template>
 
 <script>
-import { defineComponent, ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import { defineComponent, ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { useEventsStore } from '../stores/events';
 
 export default defineComponent({
@@ -107,6 +109,10 @@ export default defineComponent({
   props: {
     activeDropdown: {
       type: String,
+      default: null
+    },
+    currentEventData: {
+      type: Object,
       default: null
     }
   },
@@ -120,6 +126,9 @@ export default defineComponent({
     const searchQuery = ref('');
     const showConfirmModal = ref(false);
     const selectedEvent = ref(null);
+    const dropdownButton = ref(null);
+    const dropdownMenu = ref(null);
+    const dropdownPosition = ref({});
     
     // Computed to check if this dropdown is active
     const isActive = computed(() => props.activeDropdown === DROPDOWN_NAME);
@@ -151,6 +160,45 @@ export default defineComponent({
       return result;
     });
     
+    // Handle clicks outside the dropdown
+    const handleClickOutside = (event) => {
+      if (isActive.value &&
+          dropdownButton.value && 
+          dropdownMenu.value && 
+          !dropdownButton.value.contains(event.target) && 
+          !dropdownMenu.value.contains(event.target)) {
+        emit('dropdown-closed');
+      }
+    };
+    
+    // Calculate and set dropdown position
+    const updateDropdownPosition = () => {
+      nextTick(() => {
+        if (dropdownButton.value && dropdownMenu.value) {
+          const buttonRect = dropdownButton.value.getBoundingClientRect();
+          const menuWidth = dropdownMenu.value.offsetWidth;
+          
+          // Center the dropdown under the button
+          const left = buttonRect.left + (buttonRect.width / 2) - (menuWidth / 2);
+          
+          // Ensure the dropdown doesn't go off-screen
+          const adjustedLeft = Math.max(10, Math.min(left, window.innerWidth - menuWidth - 10));
+          
+          dropdownPosition.value = {
+            top: `${buttonRect.bottom + 5}px`,
+            left: `${adjustedLeft}px`
+          };
+        }
+      });
+    };
+    
+    // Watch for window resize events to reposition dropdown
+    const handleResize = () => {
+      if (isActive.value) {
+        updateDropdownPosition();
+      }
+    };
+    
     // Toggle dropdown
     const toggleDropdown = () => {
       if (isActive.value) {
@@ -160,6 +208,8 @@ export default defineComponent({
         searchQuery.value = '';
         // Fetch events when opening dropdown
         eventsStore.fetchEvents();
+        // Position the dropdown
+        updateDropdownPosition();
       }
     };
     
@@ -168,13 +218,41 @@ export default defineComponent({
       if (newVal !== DROPDOWN_NAME) {
         // Reset search when dropdown is closed
         searchQuery.value = '';
+      } else {
+        // Update position when dropdown becomes active
+        updateDropdownPosition();
       }
+    });
+    
+    // Add resize and click listeners when component is mounted
+    onMounted(() => {
+      window.addEventListener('resize', handleResize);
+      document.addEventListener('mousedown', handleClickOutside);
+    });
+    
+    // Clean up listeners when component is unmounted
+    onBeforeUnmount(() => {
+      window.removeEventListener('resize', handleResize);
+      document.removeEventListener('mousedown', handleClickOutside);
     });
     
     // Handle event selection
     const selectEvent = (event) => {
       selectedEvent.value = event;
-      showConfirmModal.value = true;
+      
+      // Get current event data from parent component
+      const currentEventData = JSON.stringify(props.currentEventData || {});
+      const isEmptyEvent = currentEventData === '{}' || currentEventData === '';
+      
+      if (isEmptyEvent) {
+        // If the current event is empty, directly emit the selection without confirmation
+        emit('select-event', selectedEvent.value);
+        selectedEvent.value = null;
+      } else {
+        // Otherwise, show confirmation modal
+        showConfirmModal.value = true;
+      }
+      
       emit('dropdown-closed');
     };
     
@@ -202,7 +280,11 @@ export default defineComponent({
       toggleDropdown,
       selectEvent,
       confirmEventSelection,
-      formatDate
+      formatDate,
+      dropdownButton,
+      dropdownMenu,
+      dropdownPosition,
+      updateDropdownPosition
     };
   }
 });
@@ -212,6 +294,10 @@ export default defineComponent({
 /* Ensure dropdown appears above other content */
 .dropdown-container {
   position: relative;
-  z-index: 50;
+}
+
+/* Ensure the dropdown list itself has a very high z-index */
+.fixed {
+  z-index: 9999 !important;
 }
 </style> 
