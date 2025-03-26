@@ -12,6 +12,9 @@ const Enquirer = require('enquirer');
 const fs = require('fs');
 const path = require('path');
 
+// Load package.json to get the version
+const packageJson = require('../package.json');
+
 // Load modules from src directory
 // During babel compilation, '../src/*' paths will be transformed to '../*'
 const { runHandler, scanForHandlers } = require('../src/lambda-runner');
@@ -29,7 +32,7 @@ try {
 const program = new Command();
 
 // Set up the CLI
-program.name('lambda-run').description('Test AWS Lambda functions locally').version('0.1.0');
+program.name('lambda-run').description('Test AWS Lambda functions locally').version(packageJson.version);
 
 // Run a handler with an event
 program
