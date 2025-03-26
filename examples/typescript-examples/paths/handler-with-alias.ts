@@ -2,7 +2,6 @@
  * Example TypeScript Lambda handler using path aliases
  */
 
-// Import using path alias (this would typically be '@/examples/paths/types')
 // For this example, since we're in the same project, we'll use a simpler alias
 import { User, ApiResponse, LambdaEvent } from '@/paths/types';
 import { print } from '@/paths/utils';

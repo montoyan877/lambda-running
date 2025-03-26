@@ -501,77 +501,29 @@ function scanDirectory(directory, extensions, ignorePatterns) {
 
         if (extensions.includes(ext)) {
           try {
-            // Check if it's a TypeScript file
-            const isTypeScript = ext === '.ts';
+            // Read file content to check if it's a handler
+            const content = fs.readFileSync(filePath, 'utf8');
+            
+            // More inclusive pattern that matches:
+            // - exports.handler = ...
+            // - module.exports.handler = ...
+            // - export const handler = ...
+            // - export async function handler() ...
+            // - export default { handler: ... }
+            const handlerPatterns = [
+              /(?:exports|module\.exports)\.handler\s*=/,
+              /export\s+(?:const|async\s+function)\s+handler\b/,
+              /export\s+default\s*{[^}]*handler\s*:/,
+            ];
 
-            if (isTypeScript) {
-              // Find the closest tsconfig.json to the file
-              const closestTsConfig = findClosestTsConfig(path.dirname(filePath));
-
-              if (closestTsConfig) {
-                // Set up TypeScript paths if a tsconfig was found
-                setupTypeScriptSupport(closestTsConfig, false);
-              }
-            }
-
-            // Activate layer resolver after TypeScript setup
-            // This ensures we don't override TypeScript path resolution
-            if (lambdaRunningConfig) {
-              initializeLayerResolver(lambdaRunningConfig);
-            }
-
-            // Try to require the file to see if it's a module
-            const handler = require(filePath);
-
-            // Restore original resolver right after require
-            restoreOriginalResolver();
-
-            // Only get methods named 'handler'
-            const methods = Object.keys(handler).filter(
-              (key) => typeof handler[key] === 'function' && key === 'handler'
-            );
-
-            if (methods.length > 0) {
-              // This is a valid handler file
+            const isHandler = handlerPatterns.some(pattern => pattern.test(content));
+            
+            if (isHandler) {
               if (lambdaRunningConfig && lambdaRunningConfig.debug) {
                 if (global.systemLog) {
-                  global.systemLog(
-                    `Found handler: ${filePath} with methods: ${methods.join(', ')}`
-                  );
+                  global.systemLog(`Found handler: ${filePath}`);
                 } else {
-                  console.log(`Found handler: ${filePath} with methods: ${methods.join(', ')}`);
-                }
-              }
-
-              results.push({
-                path: filePath,
-                methods,
-              });
-            }
-          } catch (error) {
-            // Make sure to restore the resolver in case of errors
-            restoreOriginalResolver();
-
-            // If it contains code that suggests it's a handler but failed due to layers
-            const isHandlerWithLayerImport =
-              error.message &&
-              error.message.includes("Cannot find module '/opt/nodejs/") &&
-              // Check if the file is not inside a 'layers' directory but is trying to use layers
-              !filePath.includes(path.sep + 'layers' + path.sep) &&
-              // Has 'exports.handler' or 'module.exports.handler' in its content
-              fs.readFileSync(filePath, 'utf8').match(/(?:exports|module\.exports)\.handler\s*=/);
-
-            if (isHandlerWithLayerImport) {
-              // This is likely a handler that uses layers
-              if (lambdaRunningConfig && lambdaRunningConfig.debug) {
-                if (global.systemLog) {
-                  global.systemLog(
-                    `Found handler with layer imports: ${filePath} (will be available at runtime)`
-                  );
-                } else {
-                  console.log(
-                    `Found handler with layer imports: ${filePath} (will be available at runtime)`
-                  );
+                  console.log(`Found handler: ${filePath}`);
                 }
               }
 
@@ -579,45 +531,14 @@ function scanDirectory(directory, extensions, ignorePatterns) {
                 path: filePath,
                 methods: ['handler'],
               });
-            } else if (
-              error.message &&
-              error.message.includes("Cannot find module '/opt/nodejs/")
-            ) {
-              // This is likely a layer file that imports from other layers
-              if (lambdaRunningConfig && lambdaRunningConfig.debug) {
-                if (global.systemLog) {
-                  global.systemLog(`Skipping layer file (imports from other layers): ${filePath}`);
-                } else {
-                  console.warn(`Skipping layer file (imports from other layers): ${filePath}`);
-                }
-              }
-            } else {
-              // For better TypeScript path resolution issues diagnostics, add more details for this type of error
-              const isTypeScriptFile = path.extname(filePath) === '.ts';
-              if (
-                error.message &&
-                error.message.includes('Cannot find module') &&
-                isTypeScriptFile
-              ) {
-                // TypeScript module errors are important, so we show these regardless of debug
-                if (global.systemLog) {
-                  global.systemLog(`TypeScript module resolution error in ${filePath}: ${error.message}
-Try configuring tsconfig.json paths or check import paths`);
-                } else {
-                  console.warn(`TypeScript module resolution error in ${filePath}: ${error.message}
-Try configuring tsconfig.json paths or check import paths`);
-                }
+            }
+          } catch (error) {
+            // Log errors but only in debug mode
+            if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+              if (global.systemLog) {
+                global.systemLog(`Could not read potential handler: ${filePath} - ${error.message}`);
               } else {
-                // Log other errors but only in debug mode
-                if (lambdaRunningConfig && lambdaRunningConfig.debug) {
-                  if (global.systemLog) {
-                    global.systemLog(
-                      `Could not load potential handler: ${filePath} - ${error.message}`
-                    );
-                  } else {
-                    console.warn(`Could not load potential handler: ${filePath}`, error.message);
-                  }
-                }
+                console.warn(`Could not read potential handler: ${filePath}`, error.message);
               }
             }
           }
