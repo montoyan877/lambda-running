@@ -5,6 +5,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const JSON5 = require('json5');
 const { loadConfig } = require('./config-loader');
 const { initializeLayerResolver, restoreOriginalResolver } = require('./layer-resolver');
 
@@ -70,7 +71,6 @@ function setupTypeScriptSupport(customConfigPath, forceSetup = false) {
 
     // If project has a tsconfig.json, use it instead of default options
     if (fs.existsSync(projectTsConfigPath)) {
-      const chalk = require('chalk');
       // This is important info, but we'll use global.systemLog to respect debug mode
       if (global.systemLog) {
         global.systemLog(`Using TypeScript configuration from ${projectTsConfigPath}`);
@@ -127,20 +127,10 @@ function setupTsConfigPaths(tsconfigPath, forceSetup = false) {
     // Read the tsconfig.json file content
     const tsconfigContent = fs.readFileSync(tsconfigPath, 'utf8');
     
-    // First try to fix common JSON issues before parsing
-    const fixedJson = tsconfigContent
-      // Remove comments
-      .replace(/\/\/.*$/gm, '')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      // Fix trailing commas in objects and arrays
-      .replace(/,(\s*[}\]])/g, '$1')
-      // Ensure all property names are double-quoted
-      .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?\s*:/g, '"$2": ');
-    
-    // Parse the fixed JSON
+    // Parse the JSON using JSON5 for better handling of TypeScript config
     let tsconfig;
     try {
-      tsconfig = JSON.parse(fixedJson);
+      tsconfig = JSON5.parse(tsconfigContent);
     } catch (parseError) {
       // Error parsing is important, so we don't limit to debug
       console.error(`Error parsing tsconfig.json at ${tsconfigPath}: ${parseError.message}`);
@@ -202,46 +192,6 @@ function setupTsConfigPaths(tsconfigPath, forceSetup = false) {
 
 // Initialize TypeScript support on module load (for the main project)
 setupTypeScriptSupport();
-
-/**
- * Parse JSON safely, with better error handling and support for common json errors
- * like trailing commas and comments
- * @param {string} jsonString - The JSON string to parse
- * @param {string} filePath - File path for error reporting
- * @returns {Object|null} - Parsed object or null if parsing failed
- */
-function safeParseJson(jsonString, filePath) {
-  try {
-    // First try standard JSON parsing
-    return JSON.parse(jsonString);
-  } catch (initialError) {
-    // Only log in debug mode - except for critical errors
-    if (lambdaRunningConfig && lambdaRunningConfig.debug) {
-      console.warn(`Warning: Initial JSON parse error in ${filePath}: ${initialError.message}`);
-      console.log('Attempting to fix common JSON issues...');
-    }
-    
-    try {
-      // Fix common issues: 
-      // 1. Remove trailing commas (very common in tsconfig.json)
-      const fixedJson = jsonString
-        // Remove comments
-        .replace(/\/\/.*$/gm, '')
-        .replace(/\/\*[\s\S]*?\*\//g, '')
-        // Fix trailing commas in objects
-        .replace(/,(\s*[}\]])/g, '$1')
-        // Ensure all property names are double-quoted
-        .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?\s*:/g, '"$2": ');
-      
-      return JSON.parse(fixedJson);
-    } catch (fixedError) {
-      // These are critical errors, so we show them regardless of debug mode
-      console.error(`Error: Failed to parse JSON after fixing in ${filePath}: ${fixedError.message}`);
-      console.error('Consider validating your JSON with a linter or online tool');
-      return null;
-    }
-  }
-}
 
 /**
  * Read and parse .lambdarunignore file in the specified directory
@@ -407,9 +357,6 @@ function setupGlobalLogging() {
  * @returns {Promise<any>} - Result from the Lambda handler
  */
 async function runHandler(handlerPath, handlerMethod, event, context = {}, options = {}) {
-  // Keep track of whether we've set up TypeScript
-  let tsconfigPathsRegistered = false;
-  
   try {
     // Setup global logging functions
     setupGlobalLogging();
@@ -466,7 +413,7 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
       // Force setup to ensure the configuration for this specific handler is used
       if (fs.existsSync(dirTsConfigPath)) {
         // For handler execution, we'll always force setup to ensure correct config is used
-        tsconfigPathsRegistered = setupTypeScriptSupport(dirTsConfigPath, true);
+        setupTypeScriptSupport(dirTsConfigPath, true);
       }
     }
 
@@ -663,8 +610,6 @@ function scanDirectory(directory, extensions, ignorePatterns) {
               continue;
             }
 
-            // For TypeScript files, set up proper path resolution
-            let tsPathsRegistered = false;
             if (isTypeScript) {
               // Look for tsconfig in the file's directory or parent directories
               const fileDir = path.dirname(filePath);
@@ -698,7 +643,7 @@ function scanDirectory(directory, extensions, ignorePatterns) {
               // Set up TypeScript paths if a tsconfig was found, but only if not already configured
               if (tsconfigPath) {
                 // Don't log again if already configured - use the improved function with registry
-                tsPathsRegistered = setupTypeScriptSupport(tsconfigPath, false);
+                setupTypeScriptSupport(tsconfigPath, false);
               }
             }
             
