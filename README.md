@@ -5,6 +5,10 @@
 
 > Run & test AWS Lambda functions locally with ease!
 
+## ✨ What is Lambda Running?
+
+Lambda Running is a powerful library that lets you test AWS Lambda functions locally without any complicated setup. Perfect for developers who want to iterate quickly and test their Lambda functions in a realistic environment.
+
 <div align="center">
   <img src="images/lambda-run-ui.png" alt="Lambda Running UI" width="800" />
   <p><em>Modern web interface for testing Lambda functions</em></p>
@@ -12,10 +16,6 @@
   <img src="images/lambda-run-ui-aws-template.png" alt="Lambda Running AWS Template" width="800" />
   <p><em>Test with AWS Lambda event templates</em></p>
 </div>
-
-## ✨ What is Lambda Running?
-
-Lambda Running is a powerful library that lets you test AWS Lambda functions locally without any complicated setup. Perfect for developers who want to iterate quickly and test their Lambda functions in a realistic environment.
 
 ## 🎯 Key Features
 
