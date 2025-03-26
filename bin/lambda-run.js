@@ -12,8 +12,27 @@ const Enquirer = require('enquirer');
 const fs = require('fs');
 const path = require('path');
 
-// Load package.json to get the version
-const packageJson = require('../package.json');
+// Load package.json to get the version - using a more robust approach
+let packageVersion = '0.0.0';
+try {
+  // Try to find package.json relative to the current file
+  const packagePath = path.join(__dirname, '..', 'package.json');
+  if (fs.existsSync(packagePath)) {
+    const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+    packageVersion = packageJson.version;
+  } else {
+    // Fallback: try to find package.json in parent directories
+    // This helps when the package is installed globally
+    const libPath = path.join(__dirname, '..', '..', 'package.json');
+    if (fs.existsSync(libPath)) {
+      const packageJson = JSON.parse(fs.readFileSync(libPath, 'utf8'));
+      packageVersion = packageJson.version;
+    }
+  }
+} catch (error) {
+  // If we can't find the version, we'll use the default
+  console.error(`Warning: Could not determine package version: ${error.message}`);
+}
 
 // Load modules from src directory
 // During babel compilation, '../src/*' paths will be transformed to '../*'
@@ -32,7 +51,7 @@ try {
 const program = new Command();
 
 // Set up the CLI
-program.name('lambda-run').description('Test AWS Lambda functions locally').version(packageJson.version);
+program.name('lambda-run').description('Test AWS Lambda functions locally').version(packageVersion);
 
 // Run a handler with an event
 program
