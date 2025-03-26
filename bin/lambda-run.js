@@ -5,20 +5,34 @@
  * Command line interface for running AWS Lambda functions locally with lambda-running library
  */
 
-const fs = require('fs');
-const path = require('path');
 const chalk = require('chalk');
 const { Command } = require('commander');
 const inquirer = require('inquirer');
 const Enquirer = require('enquirer');
+const fs = require('fs');
+const path = require('path');
 
+// Load package.json to get the version
+const packageJson = require('../package.json');
+
+// Load modules from src directory
+// During babel compilation, '../src/*' paths will be transformed to '../*'
 const { runHandler, scanForHandlers } = require('../src/lambda-runner');
 const { saveEvent, getEvents, getEvent, deleteEvent } = require('../src/event-store');
+
+// Import UI server module
+let uiServer;
+try {
+  uiServer = require('../src/ui-server');
+} catch (e) {
+  // We'll check for existence more explicitly in the UI command
+  // UI server is optional, so we'll gracefully handle missing dependency
+}
 
 const program = new Command();
 
 // Set up the CLI
-program.name('lambda-run').description('Test AWS Lambda functions locally').version('0.1.0');
+program.name('lambda-run').description('Test AWS Lambda functions locally').version(packageJson.version);
 
 // Run a handler with an event
 program
@@ -217,13 +231,230 @@ program
     }
   });
 
+// UI server only mode (internal command to prevent recursion)
+program
+  .command('ui-server')
+  .description('Launch only the API server for the UI (internal command)')
+  .option('-p, --port <port>', 'Port to run the UI server on', '3000')
+  .option('--no-open', 'Do not automatically open browser')
+  .action(async (options) => {
+    try {
+      // Check if we're already in a recursive call
+      if (process.env.LAMBDA_UI_NO_RECURSION !== 'true') {
+        console.error(
+          chalk.red('This command should not be called directly. Use "lambda-run ui" instead.')
+        );
+        process.exit(1);
+      }
+
+      // Try to require ui-server if not already loaded
+      if (!uiServer) {
+        try {
+          uiServer = require('../src/ui-server');
+        } catch (e) {
+          // Check if ui-server.js file exists
+          const uiServerPath = path.join(__dirname, '../src/ui-server.js');
+          
+          if (!fs.existsSync(uiServerPath)) {
+            console.error(
+              chalk.red('UI server module not found. The file ui-server.js is missing.')
+            );
+            process.exit(1);
+          }
+
+          // If file exists but still fails, it might be missing dependencies
+          console.error(chalk.red('UI dependencies not found. Run "npm install" to install them.'));
+          process.exit(1);
+        }
+      }
+
+      console.log(chalk.blue('Starting Lambda Running UI server...'));
+
+      // Start UI server directly
+      await uiServer.start({
+        port: parseInt(options.port, 10),
+        open: options.open !== false,
+        cwd: process.cwd(),
+      });
+
+      console.log(
+        chalk.green(`Lambda Running UI server started on http://localhost:${options.port}`)
+      );
+
+      // Keep the process running
+      process.stdin.resume();
+
+      // Handle Ctrl+C
+      process.on('SIGINT', () => {
+        console.log(chalk.yellow('\nShutting down UI server...'));
+        process.exit(0);
+      });
+    } catch (error) {
+      console.error(chalk.red(`Error starting UI server: ${error.message}`));
+      console.error(error.stack);
+      process.exit(1);
+    }
+  });
+
+// Init command - generate configuration files
+program
+  .command('init')
+  .description('Create initial configuration files (lambda-running.json and .lambdarunignore)')
+  .option('--force', 'Overwrite existing files if they exist')
+  .action(async (options) => {
+    try {
+      console.log(chalk.blue('Initializing Lambda Running configuration...'));
+      
+      const outputDir = process.cwd();
+      const force = options.force || false;
+      let filesCreated = 0;
+      
+      // Generate lambda-running.json
+      const configPath = path.join(outputDir, 'lambda-running.json');
+      if (fs.existsSync(configPath) && !force) {
+        console.log(chalk.yellow(`Config file already exists at ${configPath}. Use --force to overwrite.`));
+      } else {
+        // Create a readable configuration
+        const config = {
+          layers: [],
+          layerMappings: {},
+          envFiles: ['.env'],
+          ignorePatterns: [
+            '**/*.test.js',
+            '**/*.spec.js',
+            '**/__tests__/**'
+          ],
+          ignoreLayerFilesOnScan: true,
+          debug: false
+        };
+        
+        // Write the file with nice formatting
+        fs.writeFileSync(
+          configPath, 
+          JSON.stringify(config, null, 2)
+        );
+        
+        console.log(chalk.green(`Created configuration file at ${configPath}`));
+        filesCreated++;
+      }
+      
+      // Generate .lambdarunignore
+      const ignorePath = path.join(outputDir, '.lambdarunignore');
+      if (fs.existsSync(ignorePath) && !force) {
+        console.log(chalk.yellow(`Ignore file already exists at ${ignorePath}. Use --force to overwrite.`));
+      } else {
+        // Default ignore patterns
+        const ignorePatterns = [
+          '# Lambda Running ignore file',
+          '# Files and directories matching these patterns will be ignored when scanning for handlers',
+          '',
+          '# Dependencies',
+          'node_modules/',
+          'package-lock.json',
+          'yarn.lock',
+          'cdk.out',
+          '',
+          '# Tests',
+          'test/',
+          'tests/',
+          '**/*.test.js',
+          '**/*.spec.js',
+          '**/__tests__/',
+          '**/__mocks__/',
+          '',
+          '# Build files',
+          'dist/',
+          'build/',
+          'coverage/',
+          '',
+          '# Config files',
+          '*.config.js',
+          '.eslintrc*',
+          '.prettier*',
+          '',
+          '# Documentation',
+          'docs/',
+          'README.md',
+          'LICENSE',
+          '',
+          '# Version control',
+          '.git/',
+          '.github/',
+          '.gitignore',
+          '',
+          '# IDE files',
+          '.vscode/',
+          '.idea/',
+          '*.sublime-*',
+          ''
+        ].join('\n');
+        
+        // Write the file
+        fs.writeFileSync(ignorePath, ignorePatterns);
+        
+        console.log(chalk.green(`Created ignore file at ${ignorePath}`));
+        filesCreated++;
+      }
+      
+      if (filesCreated > 0) {
+        console.log(chalk.green('Initialization complete. You may need to customize the files for your project.'));
+      } else {
+        console.log(chalk.yellow('No files were created. Use --force to overwrite existing files.'));
+      }
+    } catch (error) {
+      console.error(chalk.red(`Error initializing configuration: ${error.message}`));
+      console.error(error.stack);
+      process.exit(1);
+    }
+  });
+
+// UI mode
+program
+  .command('ui')
+  .description('Launch interactive web UI for testing Lambda functions')
+  .option('-p, --port <port>', 'Port to run the UI server on', '3000')
+  .option('--no-open', 'Do not automatically open browser')
+  .action(async (options) => {
+    try {
+      // Try to require ui-start.js
+      try {
+        require('../lib/bin/ui-start');
+      } catch (e) {
+        // If it fails, try directly using the UI server
+        try {
+          uiServer = require('../src/ui-server');
+        } catch (e) {
+          console.error(
+            chalk.red('UI server module not found. The file ui-server.js is missing.')
+          );
+          process.exit(1);
+        }
+
+        console.log(chalk.blue('Starting Lambda Running UI server...'));
+
+        // Start UI server directly with API only (not development mode)
+        await uiServer.start({
+          port: parseInt(options.port, 10),
+          open: options.open !== false,
+          cwd: process.cwd(),
+          developmentMode: false,
+        });
+
+        console.log(
+          chalk.green(`Lambda Running UI server started on http://localhost:${options.port}`)
+        );
+      }
+    } catch (error) {
+      console.error(chalk.red(`Error starting UI server: ${error.message}`));
+      console.error(error.stack);
+      process.exit(1);
+    }
+  });
+
 // Helper function for input in the most basic way possible
 function readInput(prompt, defaultValue = '') {
   return new Promise((resolve) => {
     process.stdout.write(`${prompt}${defaultValue ? ' (' + defaultValue + ')' : ''}: `);
-
-    // Array to store chunks
-    const inputChunks = [];
 
     // Handle input
     process.stdin.resume();
@@ -316,7 +547,7 @@ async function runInteractiveMode() {
       // Display the selected handler for clarity
       console.log(
         chalk.cyan(
-          `\nSelected handler: ${path.relative(process.cwd(), handler.path)} -> ${handler.method}`
+          `\nSelected handler: ${path.relative(process.cwd(), handler.path)}`
         )
       );
 

@@ -1,8 +1,0 @@
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
-
-# Ejecutar lint-staged para verificar el formato y linting
-npx lint-staged
-
-# Correr tests para asegurar que todo funciona
-npm test

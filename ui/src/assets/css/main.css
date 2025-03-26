@@ -1,0 +1,123 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom CSS for Lambda Running UI */
+@layer base {
+  html, body, #app {
+    @apply h-full font-sans antialiased;
+    @apply text-gray-900 bg-gray-50 dark:text-white dark:bg-[#0f131a];
+  }
+  
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-200 dark:bg-dark-300 bg-opacity-30 rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 dark:bg-dark-300 rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400 dark:bg-dark-hover;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white dark:bg-dark-100 rounded-lg shadow-lg overflow-hidden p-5;
+  }
+  
+  .card-title {
+    @apply text-lg font-medium text-gray-900 dark:text-white mb-2;
+  }
+  
+  .sidebar-item {
+    @apply flex items-center px-3 py-2 rounded-md text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-dark-hover hover:text-gray-900 dark:hover:text-white transition-colors;
+  }
+  
+  .sidebar-item.active {
+    @apply bg-primary-500 bg-opacity-10 text-primary-700 dark:text-white;
+  }
+  
+  .input {
+    @apply w-full px-3 py-2 bg-gray-50 dark:bg-dark-200 border border-gray-300 dark:border-dark-border rounded-md focus:outline-none focus:border-primary-500 transition-colors text-gray-900 dark:text-white;
+  }
+  
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .btn-primary {
+    @apply bg-primary-500 hover:bg-primary-600 text-white;
+  }
+  
+  .btn-secondary {
+    @apply bg-secondary-500 hover:bg-secondary-600 text-white;
+  }
+  
+  .btn-outline {
+    @apply border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-hover;
+  }
+  
+  .btn-sm {
+    @apply px-3 py-1.5 text-sm;
+  }
+  
+  .terminal-container {
+    @apply font-mono text-sm rounded-md overflow-hidden;
+    background-color: var(--color-terminal-background);
+    color: var(--color-terminal-foreground);
+  }
+  
+  .code-editor {
+    @apply rounded-md border border-gray-200 dark:border-dark-border overflow-hidden;
+  }
+}
+
+/* Theme Colors */
+:root {
+  /* Light Theme Colors (Default) */
+  --color-dark-100: #ffffff;
+  --color-dark-200: #f9fafb;
+  --color-dark-300: #f3f4f6;
+  --color-dark-hover: #e5e7eb;
+  --color-dark-border: #d1d5db;
+  
+  --color-primary-100: #e0e7ff;
+  --color-primary-500: #6366f1;
+  --color-primary-600: #4f46e5;
+  --color-primary-700: #4338ca;
+  
+  --color-secondary-500: #64748b;
+  --color-secondary-600: #475569;
+  
+  /* Terminal colors - must match Monaco editor theme */
+  --color-terminal-background: #f8fafc;
+  --color-terminal-foreground: #1e293b;
+}
+
+/* Dark Theme Colors */
+.dark {
+  --color-dark-100: #1a1f2d;
+  --color-dark-200: #151921;
+  --color-dark-300: #22283b;
+  --color-dark-hover: #242c44;
+  --color-dark-border: #2d334d;
+  
+  --color-primary-100: #312e81;
+  --color-primary-500: #6366f1;
+  --color-primary-600: #4f46e5;
+  --color-primary-700: #4338ca;
+  
+  --color-secondary-500: #64748b;
+  --color-secondary-600: #475569;
+  
+  /* Terminal colors - must match Monaco editor theme */
+  --color-terminal-background: #0e1117;
+  --color-terminal-foreground: #c8d3f5;
+} 
