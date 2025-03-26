@@ -8,7 +8,7 @@
   >
     <div class="space-y-4">
       <div class="form-group">
-        <label for="event-name" class="block text-sm font-medium text-gray-300 mb-1">Event Name</label>
+        <label for="event-name" class="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Event Name</label>
         <input 
           type="text" 
           id="event-name" 
@@ -20,7 +20,7 @@
       </div>
       
       <div class="form-group">
-        <label for="event-category" class="block text-sm font-medium text-gray-300 mb-1">Category (optional)</label>
+        <label for="event-category" class="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Category (optional)</label>
         <input 
           type="text" 
           id="event-category" 

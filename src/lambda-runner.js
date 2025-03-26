@@ -5,75 +5,118 @@
 
 const path = require('path');
 const fs = require('fs');
+const { loadConfig } = require('./config-loader');
+const { initializeLayerResolver, restoreOriginalResolver } = require('./layer-resolver');
 
-// Check if ts-node is installed
-let tsNodeAvailable = false;
-let tsconfigPathsAvailable = false;
+// Global config object
+let lambdaRunningConfig = null;
+
+// Registry of already configured TypeScript paths to avoid duplicate logs
+let configuredTsConfigPaths = new Set();
 
 // Skip TS check if environment variable is set (for development mode)
 const skipTsCheck = process.env.SKIP_TS_CHECK === 'true';
 
-if (!skipTsCheck) {
+/**
+ * Find the closest tsconfig.json file from a given path
+ * @param {string} startPath - Path to start searching from
+ * @returns {string|null} - Path to the closest tsconfig.json or null if not found
+ */
+function findClosestTsConfig(startPath) {
+  let currentDir = startPath;
+
+  // First check in the current directory
+  let tsConfigPath = path.join(currentDir, 'tsconfig.json');
+  if (fs.existsSync(tsConfigPath)) {
+    return tsConfigPath;
+  }
+
+  // Look in parent directories up to the project root
+  while (currentDir !== process.cwd() && path.dirname(currentDir) !== currentDir) {
+    currentDir = path.dirname(currentDir);
+    tsConfigPath = path.join(currentDir, 'tsconfig.json');
+    if (fs.existsSync(tsConfigPath)) {
+      return tsConfigPath;
+    }
+  }
+
+  // If not found in parent directories, check project root
+  const rootTsConfig = path.join(process.cwd(), 'tsconfig.json');
+  if (fs.existsSync(rootTsConfig)) {
+    return rootTsConfig;
+  }
+
+  return null;
+}
+
+/**
+ * Sets up TypeScript support for the project
+ * @param {string} [customConfigPath] - Optional path to a specific tsconfig.json file
+ * @param {boolean} [forceSetup=false] - Whether to force setup even if already configured
+ * @returns {boolean} - Whether setup was successful
+ */
+function setupTypeScriptSupport(customConfigPath, forceSetup = false) {
+  if (skipTsCheck) {
+    // Only log in debug mode
+    if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+      console.log('Skipping TypeScript setup as SKIP_TS_CHECK is true');
+    }
+    return false;
+  }
+
   try {
-    require.resolve('ts-node');
-    tsNodeAvailable = true;
-
-    // Check if tsconfig-paths is installed for alias support
-    try {
-      require.resolve('tsconfig-paths');
-      tsconfigPathsAvailable = true;
-    } catch (err) {
-      console.warn('Path aliases not supported. Install tsconfig-paths if needed.');
-      tsconfigPathsAvailable = false;
-    }
-
-    // Look for project's tsconfig.json
-    const projectTsConfigPath = path.join(process.cwd(), 'tsconfig.json');
-    let tsNodeOptions = {
-      transpileOnly: true,
-      compilerOptions: {
-        module: 'commonjs',
-        target: 'es2017',
-      },
-    };
-
-    // If project has a tsconfig.json, use it instead of default options
-    if (fs.existsSync(projectTsConfigPath)) {
-      const chalk = require('chalk');
-      console.log(chalk.green(`Using TypeScript configuration from ${projectTsConfigPath}`));
-      // ts-node will automatically pick up the tsconfig.json from the project root
-      // We still set transpileOnly for better performance
-      tsNodeOptions = { transpileOnly: true };
-
-      // Register tsconfig-paths if available to support path aliases
-      if (tsconfigPathsAvailable) {
-        // Load the tsconfig manually to check for path aliases
-        let tsconfig;
-        try {
-          tsconfig = JSON.parse(fs.readFileSync(projectTsConfigPath, 'utf8'));
-          if (tsconfig.compilerOptions && tsconfig.compilerOptions.paths) {
-            // Register tsconfig-paths
-            require('tsconfig-paths').register({
-              baseUrl: tsconfig.compilerOptions.baseUrl || '.',
-              paths: tsconfig.compilerOptions.paths,
-            });
-          }
-        } catch (e) {
-          console.warn(`Error parsing tsconfig.json: ${e.message}`);
-        }
-      }
+    // Only try to resolve ts-node if we have a custom config path (meaning we found a TypeScript file)
+    if (customConfigPath) {
+      require.resolve('ts-node');
     } else {
-      console.log('No tsconfig.json found, using default TypeScript configuration');
+      // If no custom config path, we don't need ts-node
+      return false;
     }
 
-    // Register ts-node to import .ts files
-    require('ts-node').register(tsNodeOptions);
+    // Use the provided config path or find the closest one
+    const projectTsConfigPath = customConfigPath || findClosestTsConfig(process.cwd());
+
+    if (!projectTsConfigPath) {
+      // Only log in debug mode
+      if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+        console.log('No tsconfig.json found, skipping TypeScript setup');
+      }
+      return false;
+    }
+
+    // Check if we've already configured this tsconfig
+    const normalizedPath = path.normalize(projectTsConfigPath);
+    if (!forceSetup && configuredTsConfigPaths.has(normalizedPath)) {
+      // Already configured, skip duplicate setup and logs
+      return true;
+    }
+
+    // This is important info, but we'll use global.systemLog to respect debug mode
+    if (global.systemLog) {
+      global.systemLog(`Using TypeScript configuration from ${projectTsConfigPath}`);
+    } else if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+      console.log(`Using TypeScript configuration from ${projectTsConfigPath}`);
+    }
+
+    // Set TS_NODE_PROJECT environment variable to the absolute path of tsconfig.json
+    process.env.TS_NODE_PROJECT = projectTsConfigPath;
+
+    // Register ts-node with the project's tsconfig.json and tsconfig-paths support
+    require('ts-node').register({
+      project: projectTsConfigPath,
+      transpileOnly: true,
+      require: ['tsconfig-paths/register'],
+    });
+
+    // Add to configured paths registry
+    configuredTsConfigPaths.add(normalizedPath);
+    return true;
   } catch (err) {
     // ts-node is not installed, continue without it
+    // This is an important warning, so we don't limit to debug
     console.warn(`ts-node not found: ${err.message}`);
+    return false;
   }
-} else {
-  console.log('Skipping TypeScript setup as SKIP_TS_CHECK is true');
 }
 
 /**
@@ -97,7 +140,10 @@ function readIgnoreFile(directory) {
       ignorePatterns.push(...lines);
     }
   } catch (error) {
-    console.warn('Could not read .lambdarunignore file:', error.message);
+    // Only log in debug mode
+    if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+      console.warn('Could not read .lambdarunignore file:', error.message);
+    }
   }
 
   return ignorePatterns;
@@ -110,16 +156,40 @@ function readIgnoreFile(directory) {
  * @returns {boolean} - True if path should be ignored
  */
 function shouldIgnore(filePath, ignorePatterns) {
-  const relativePath = path.basename(filePath);
+  // Normalize the path to use forward slashes for consistent matching
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  const fileName = path.basename(filePath);
 
   for (const pattern of ignorePatterns) {
-    // Simple globbing support for * as wildcard
-    if (pattern.includes('*')) {
-      const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
-      if (regex.test(relativePath)) {
+    // Normalize pattern to use forward slashes
+    const normalizedPattern = pattern.replace(/\\/g, '/');
+
+    // Check for ** glob patterns (matches any directory recursively)
+    if (normalizedPattern.includes('**')) {
+      // Convert ** to regex: dir/** becomes dir/.*
+      const regexPattern = normalizedPattern
+        .replace(/\./g, '\\.') // Escape dots
+        .replace(/\*\*/g, '.*'); // ** becomes .*
+
+      const regex = new RegExp(regexPattern);
+      if (regex.test(normalizedPath)) {
         return true;
       }
-    } else if (relativePath === pattern || filePath.includes(`/${pattern}/`)) {
+    }
+    // Check for * glob pattern (matches any characters in a single directory)
+    else if (normalizedPattern.includes('*')) {
+      // Convert * to regex: *.js becomes .*\.js
+      const regexPattern = normalizedPattern
+        .replace(/\./g, '\\.') // Escape dots
+        .replace(/\*/g, '.*'); // * becomes .*
+
+      const regex = new RegExp(`^${regexPattern}$`);
+      if (regex.test(fileName) || regex.test(normalizedPath)) {
+        return true;
+      }
+    }
+    // Simple direct matching - check both filename and full path
+    else if (fileName === normalizedPattern || normalizedPath.includes(`/${normalizedPattern}/`)) {
       return true;
     }
   }
@@ -128,33 +198,35 @@ function shouldIgnore(filePath, ignorePatterns) {
 }
 
 /**
- * Load environment variables from .env file if it exists
- * @param {string} directory - Directory where to look for .env file
- * @returns {Object} - Environment variables loaded from .env file
+ * Load environment variables from .env file
+ * @param {string} directory - Directory containing .env file
+ * @param {string} envFile - Name of the env file (default: '.env')
+ * @returns {object} - Object with environment variables
  */
-function loadEnvFile(directory) {
-  const envVars = {};
+function loadEnvFile(directory, envFile = '.env') {
+  const dotenv = {};
+
   try {
-    const envFilePath = path.join(directory, '.env');
+    const dotenvPath = path.join(directory, envFile);
+    if (fs.existsSync(dotenvPath)) {
+      const content = fs.readFileSync(dotenvPath, 'utf8');
+      const lines = content.split('\n');
 
-    if (fs.existsSync(envFilePath)) {
-      global.systemLog ? global.systemLog(`Loading environment variables from ${envFilePath}`) : 
-        console.log(`Loading environment variables from ${envFilePath}`);
-      
-      const content = fs.readFileSync(envFilePath, 'utf8');
-      const lines = content
-        .split('\n')
-        .map((line) => line.trim())
-        .filter((line) => line && !line.startsWith('#'));
+      lines.forEach((line) => {
+        line = line.trim();
+        // Skip empty lines and comments
+        if (line === '' || line.startsWith('#')) {
+          return;
+        }
 
-      for (const line of lines) {
-        // Parse key=value format
+        // Parse line as KEY=VALUE
         const match = line.match(/^([^=]+)=(.*)$/);
         if (match) {
-          const key = match[1].trim();
-          let value = match[2].trim();
+          let [, key, value] = match;
+          key = key.trim();
+          value = value.trim();
 
-          // Remove quotes if present
+          // Remove quotes around the value if present
           if (
             (value.startsWith('"') && value.endsWith('"')) ||
             (value.startsWith("'") && value.endsWith("'"))
@@ -162,28 +234,41 @@ function loadEnvFile(directory) {
             value = value.substring(1, value.length - 1);
           }
 
-          envVars[key] = value;
+          dotenv[key] = value;
         }
+      });
+
+      // This information is only meaningful in debug mode
+      global.systemLog(`Loading environment variables from ${dotenvPath}`);
+    } else {
+      // Env file doesn't exist, but that's okay - just continue without it
+      if (envFile === '.env') {
+        // This information is only meaningful in debug mode
+        global.systemLog('No .env file found, continuing without it');
       }
     }
   } catch (error) {
-    global.systemLog ? global.systemLog(`Could not read .env file: ${error.message}`) : 
-      console.warn('Could not read .env file:', error.message);
+    // This is an error, but still only meaningful in debug mode
+    global.systemLog(`Error loading ${envFile}: ${error.message}`);
   }
 
-  return envVars;
+  return dotenv;
 }
 
-// Añadir función global para facilitar el logueo explícito para Lambda Running
+// Add global function to facilitate explicit logging for Lambda Running
 function setupGlobalLogging() {
-  // Función global para imprimir logs explícitos de Lambda
+  // Global function to print explicit Lambda logs
   global.lambdaLog = (...args) => {
     console.log(`[LAMBDA] ${args.join(' ')}`);
   };
-  
-  // Función global para imprimir logs de sistema (que serán filtrados y no aparecerán en el Output)
+
+  // Global function to print system logs (which will be filtered and won't appear in the Output)
+  // Only log if debug mode is enabled in the config
   global.systemLog = (...args) => {
-    console.info(`[SYSTEM] ${args.join(' ')}`);
+    // Only show system logs in debug mode
+    if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+      console.info(`[SYSTEM] ${args.join(' ')}`);
+    }
   };
 }
 
@@ -199,17 +284,14 @@ function setupGlobalLogging() {
  */
 async function runHandler(handlerPath, handlerMethod, event, context = {}, options = {}) {
   try {
-    // Configurar funciones globales de logging
+    // Setup global logging functions
     setupGlobalLogging();
-    
+
     // Set default options
     const opts = {
       loadEnv: true,
       ...options,
     };
-
-    // Log de sistema usando systemLog - no será visible en el Output
-    global.systemLog(`Starting execution of handler: ${handlerPath} -> ${handlerMethod}`);
 
     // Resolve the absolute path if it's relative
     const absolutePath = path.isAbsolute(handlerPath)
@@ -219,9 +301,51 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
     // Get the directory of the handler file
     const handlerDir = path.dirname(absolutePath);
 
+    // Load configuration based on handler directory first, then fallback to cwd
+    // This ensures that we find the config appropriate for this specific handler
+    lambdaRunningConfig = loadConfig(handlerDir);
+
+    // Check if it's a TypeScript file and setup TypeScript support
+    const isTypeScript = absolutePath.endsWith('.ts');
+    if (isTypeScript) {
+      // Find the closest tsconfig.json to the handler
+      const closestTsConfig = findClosestTsConfig(handlerDir);
+
+      if (!closestTsConfig) {
+        throw new Error(
+          'TypeScript file found but no tsconfig.json was found in the handler directory or parent directories'
+        );
+      }
+
+      // Set up TypeScript with the found tsconfig
+      setupTypeScriptSupport(closestTsConfig, true);
+    }
+
+    // Initialize layer resolver AFTER TypeScript setup to avoid overriding path mappings
+    if (lambdaRunningConfig.debug) {
+      global.systemLog(`Initializing layer resolver for ${path.basename(absolutePath)}`);
+    }
+
+    // Initialize the layer resolver for running a handler
+    initializeLayerResolver(lambdaRunningConfig);
+
+    // System log using systemLog - won't be visible in the Output
+    global.systemLog(`Starting execution of handler: ${handlerPath} -> ${handlerMethod}`);
+
     // Load environment variables from .env if enabled
     if (opts.loadEnv) {
-      const envVars = loadEnvFile(process.cwd());
+      // If config specifies env files, use those, otherwise use default .env
+      const envFiles =
+        lambdaRunningConfig && lambdaRunningConfig.envFiles
+          ? lambdaRunningConfig.envFiles
+          : ['.env'];
+      let envVars = {};
+
+      // Load each env file in order
+      for (const envFile of envFiles) {
+        const vars = loadEnvFile(process.cwd(), envFile);
+        envVars = { ...envVars, ...vars };
+      }
 
       // Apply environment variables
       for (const [key, value] of Object.entries(envVars)) {
@@ -232,23 +356,6 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
     // Check if the file exists
     if (!fs.existsSync(absolutePath)) {
       throw new Error(`Handler file not found: ${absolutePath}`);
-    }
-
-    // Check if it's a TypeScript file and ts-node is not available
-    const isTypeScript = absolutePath.endsWith('.ts');
-    if (isTypeScript) {
-      if (!tsNodeAvailable) {
-        throw new Error(
-          'TypeScript files require ts-node. Please install it with: npm install -g ts-node typescript'
-        );
-      }
-
-      // Check for a tsconfig.json specific to the handler's directory
-      const dirTsConfigPath = path.join(handlerDir, 'tsconfig.json');
-      if (fs.existsSync(dirTsConfigPath) && path.dirname(absolutePath) !== process.cwd()) {
-        const chalk = require('chalk');
-        global.systemLog(`Using TypeScript configuration from handler directory: ${dirTsConfigPath}`);
-      }
     }
 
     // Clear cache to reload the handler if it's been changed
@@ -277,65 +384,14 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
     };
 
     // Execute the handler
-    global.systemLog('Executing handler...');
-    const startTime = Date.now();
-    
-    // Ejecutar el handler dentro de un try-catch para capturar errores
-    let result;
-    try {
-      result = await handler[handlerMethod](event, defaultContext);
-    } catch (handlerError) {
-      // Para las excepciones que ocurren durante la ejecución del handler,
-      // necesitamos asegurarnos de capturar el nombre exacto de la excepción
-      
-      if (handlerError instanceof Error) {
-        // Capturar el nombre exacto de la clase de error
-        // Hacemos el log de una manera especial para que se preserve el nombre de la clase
-        console.log(`${handlerError.constructor.name || handlerError.name || 'Error'} [Error]`);
-        
-        // Logueamos el stack trace si existe, o el mensaje de error si no hay stack
-        if (handlerError.stack) {
-          console.log(handlerError.stack.split('\n').slice(1).join('\n'));
-        } else if (handlerError.message) {
-          console.log(handlerError.message);
-        }
-        
-        // Detalles adicionales solo en logs del sistema
-        global.systemLog(`Error interceptado: ${handlerError.constructor.name || handlerError.name}: ${handlerError.message}`);
-        
-        // Si el error tiene propiedades adicionales, mostrarlas solo en los logs del sistema
-        const errorProps = {};
-        for (const key in handlerError) {
-          if (key !== 'name' && key !== 'message' && key !== 'stack' && typeof handlerError[key] !== 'function') {
-            errorProps[key] = handlerError[key];
-          }
-        }
-        
-        if (Object.keys(errorProps).length > 0) {
-          global.systemLog('Error additional details:', errorProps);
-        }
-      } else {
-        // Si no es un Error, loguearlo tal cual
-        console.log(handlerError);
-      }
-      
-      // Re-lanzar el error para que se maneje adecuadamente
-      throw handlerError;
-    }
-    
-    const endTime = Date.now();
-    const duration = endTime - startTime;
-    
-    global.systemLog(`Handler returned result: ${JSON.stringify(result, null, 2)}`);
-    global.systemLog(`Execution completed in ${duration}ms`);
-    return result;
+    return await handler[handlerMethod](event, defaultContext);
   } catch (error) {
-    // También usar systemLog para los mensajes de error para que no se muestren en el Output
-    global.systemLog(`Error: ${error.message}`);
-    global.systemLog(`Error details: ${error.stack}`);
-    
-    // Asegurarnos de que el error se propague para ser manejado por quien llamó a esta función
+    // Handler execution errors are important, so we show them regardless of debug mode
+    console.error('Error executing handler:', error);
     throw error;
+  } finally {
+    // Restore the original module resolver
+    restoreOriginalResolver();
   }
 }
 
@@ -356,14 +412,55 @@ function scanForHandlers(directory, extensions = ['.js', '.ts'], options = {}) {
     ...options,
   };
 
+  // Load configuration if not already loaded
+  if (!lambdaRunningConfig) {
+    lambdaRunningConfig = loadConfig(directory);
+    if (lambdaRunningConfig.debug) {
+      global.systemLog('Lambda Running configuration loaded for handler scanning');
+    }
+  }
+
   // Get ignore patterns
   let ignorePatterns = [];
   if (opts.ignoreNodeModules) {
-    ignorePatterns.push('node_modules');
+    ignorePatterns.push('node_modules/**');
+  }
+  if (opts.useIgnoreFile) {
+    const ignoreFilePatterns = readIgnoreFile(directory);
+    ignorePatterns = [...ignorePatterns, ...ignoreFilePatterns];
   }
 
-  if (opts.useIgnoreFile) {
-    ignorePatterns = readIgnoreFile(directory);
+  // Add any additional ignore patterns from configuration
+  if (
+    lambdaRunningConfig &&
+    lambdaRunningConfig.ignorePatterns &&
+    Array.isArray(lambdaRunningConfig.ignorePatterns)
+  ) {
+    ignorePatterns = [...ignorePatterns, ...lambdaRunningConfig.ignorePatterns];
+  }
+
+  // If ignoreLayerFilesOnScan is enabled, ignore files in layers directory
+  if (lambdaRunningConfig && lambdaRunningConfig.ignoreLayerFilesOnScan) {
+    const layersDir = path.join(directory, 'layers/**');
+    if (lambdaRunningConfig.debug) {
+      global.systemLog(`Ignoring layer files during scan: ${layersDir}`);
+    }
+    ignorePatterns.push(layersDir);
+
+    // Also ignore layer paths from layerMappings
+    if (lambdaRunningConfig.layerMappings) {
+      Object.values(lambdaRunningConfig.layerMappings).forEach((localPath) => {
+        // If path is relative, make it absolute
+        const absolutePath = path.isAbsolute(localPath)
+          ? localPath
+          : path.join(directory, localPath);
+
+        if (lambdaRunningConfig.debug) {
+          global.systemLog(`Ignoring layer mapping path during scan: ${absolutePath}`);
+        }
+        ignorePatterns.push(absolutePath + '/**');
+      });
+    }
   }
 
   return scanDirectory(directory, extensions, ignorePatterns);
@@ -384,6 +481,13 @@ function scanDirectory(directory, extensions, ignorePatterns) {
 
       // Skip files/directories that match ignore patterns
       if (shouldIgnore(filePath, ignorePatterns)) {
+        if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+          if (global.systemLog) {
+            global.systemLog(`Ignoring file due to pattern match: ${filePath}`);
+          } else {
+            console.log(`Ignoring file due to pattern match: ${filePath}`);
+          }
+        }
         continue;
       }
 
@@ -397,17 +501,30 @@ function scanDirectory(directory, extensions, ignorePatterns) {
 
         if (extensions.includes(ext)) {
           try {
-            // Check if it's a TypeScript file and ts-node is not available
+            // Check if it's a TypeScript file
             const isTypeScript = ext === '.ts';
-            if (isTypeScript && !tsNodeAvailable) {
-              global.systemLog ? 
-                global.systemLog(`Skipping TypeScript file (ts-node not available): ${filePath}`) : 
-                console.warn(`Skipping TypeScript file (ts-node not available): ${filePath}`);
-              continue;
+
+            if (isTypeScript) {
+              // Find the closest tsconfig.json to the file
+              const closestTsConfig = findClosestTsConfig(path.dirname(filePath));
+
+              if (closestTsConfig) {
+                // Set up TypeScript paths if a tsconfig was found
+                setupTypeScriptSupport(closestTsConfig, false);
+              }
+            }
+
+            // Activate layer resolver after TypeScript setup
+            // This ensures we don't override TypeScript path resolution
+            if (lambdaRunningConfig) {
+              initializeLayerResolver(lambdaRunningConfig);
             }
 
             // Try to require the file to see if it's a module
             const handler = require(filePath);
+
+            // Restore original resolver right after require
+            restoreOriginalResolver();
 
             // Only get methods named 'handler'
             const methods = Object.keys(handler).filter(
@@ -415,24 +532,105 @@ function scanDirectory(directory, extensions, ignorePatterns) {
             );
 
             if (methods.length > 0) {
+              // This is a valid handler file
+              if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+                if (global.systemLog) {
+                  global.systemLog(
+                    `Found handler: ${filePath} with methods: ${methods.join(', ')}`
+                  );
+                } else {
+                  console.log(`Found handler: ${filePath} with methods: ${methods.join(', ')}`);
+                }
+              }
+
               results.push({
                 path: filePath,
                 methods,
               });
             }
           } catch (error) {
-            // Skip files that can't be required
-            global.systemLog ? 
-              global.systemLog(`Could not load potential handler: ${filePath} - ${error.message}`) : 
-              console.warn(`Could not load potential handler: ${filePath}`, error.message);
+            // Make sure to restore the resolver in case of errors
+            restoreOriginalResolver();
+
+            // If it contains code that suggests it's a handler but failed due to layers
+            const isHandlerWithLayerImport =
+              error.message &&
+              error.message.includes("Cannot find module '/opt/nodejs/") &&
+              // Check if the file is not inside a 'layers' directory but is trying to use layers
+              !filePath.includes(path.sep + 'layers' + path.sep) &&
+              // Has 'exports.handler' or 'module.exports.handler' in its content
+              fs.readFileSync(filePath, 'utf8').match(/(?:exports|module\.exports)\.handler\s*=/);
+
+            if (isHandlerWithLayerImport) {
+              // This is likely a handler that uses layers
+              if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+                if (global.systemLog) {
+                  global.systemLog(
+                    `Found handler with layer imports: ${filePath} (will be available at runtime)`
+                  );
+                } else {
+                  console.log(
+                    `Found handler with layer imports: ${filePath} (will be available at runtime)`
+                  );
+                }
+              }
+
+              results.push({
+                path: filePath,
+                methods: ['handler'],
+              });
+            } else if (
+              error.message &&
+              error.message.includes("Cannot find module '/opt/nodejs/")
+            ) {
+              // This is likely a layer file that imports from other layers
+              if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+                if (global.systemLog) {
+                  global.systemLog(`Skipping layer file (imports from other layers): ${filePath}`);
+                } else {
+                  console.warn(`Skipping layer file (imports from other layers): ${filePath}`);
+                }
+              }
+            } else {
+              // For better TypeScript path resolution issues diagnostics, add more details for this type of error
+              const isTypeScriptFile = path.extname(filePath) === '.ts';
+              if (
+                error.message &&
+                error.message.includes('Cannot find module') &&
+                isTypeScriptFile
+              ) {
+                // TypeScript module errors are important, so we show these regardless of debug
+                if (global.systemLog) {
+                  global.systemLog(`TypeScript module resolution error in ${filePath}: ${error.message}
+Try configuring tsconfig.json paths or check import paths`);
+                } else {
+                  console.warn(`TypeScript module resolution error in ${filePath}: ${error.message}
+Try configuring tsconfig.json paths or check import paths`);
+                }
+              } else {
+                // Log other errors but only in debug mode
+                if (lambdaRunningConfig && lambdaRunningConfig.debug) {
+                  if (global.systemLog) {
+                    global.systemLog(
+                      `Could not load potential handler: ${filePath} - ${error.message}`
+                    );
+                  } else {
+                    console.warn(`Could not load potential handler: ${filePath}`, error.message);
+                  }
+                }
+              }
+            }
           }
         }
       }
     }
   } catch (error) {
-    global.systemLog ? 
-      global.systemLog(`Error scanning directory ${directory}: ${error.message}`) : 
+    // Directory scanning errors are important, show them regardless of debug mode
+    if (global.systemLog) {
+      global.systemLog(`Error scanning directory ${directory}: ${error.message}`);
+    } else {
       console.error(`Error scanning directory ${directory}:`, error);
+    }
   }
 
   return results;
@@ -441,4 +639,6 @@ function scanDirectory(directory, extensions, ignorePatterns) {
 module.exports = {
   runHandler,
   scanForHandlers,
+  setupTypeScriptSupport,
 };
+

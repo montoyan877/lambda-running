@@ -1,28 +1,138 @@
 # Development files
 .git
-.github
 .gitignore
 .eslintrc.js
 .eslintignore
+.prettierrc
+.babelrc
+.env
+.env.example
+.editorconfig
+tsconfig.json
 jest.config.js
-coverage/
 
 # Tests
-test/
+tests/
 __tests__/
 *.test.js
 *.spec.js
+coverage/
 
-# Build process
-node_modules/
-.npm/
-.DS_Store
-*.log
+# UI source
+ui/
+!ui/package.json
 
-# IDE related
-.idea/
-.vscode/
+# Build assets not needed
+src/ui-dist/assets/*.map
+src/ui-dist/assets/*.d.ts
+src/ui-dist/assets/*.css.map
+src/ui-dist/assets/*.js.map
+
+# Exclude Monaco and language files completely
+src/ui-dist/assets/monaco-*.js
+src/ui-dist/assets/monaco-*.css
+src/ui-dist/assets/*-*[a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9].js
+src/ui-dist/assets/abap-*.js
+src/ui-dist/assets/apex-*.js
+src/ui-dist/assets/azcli-*.js
+src/ui-dist/assets/bat-*.js
+src/ui-dist/assets/bicep-*.js
+src/ui-dist/assets/cameligo-*.js
+src/ui-dist/assets/clojure-*.js
+src/ui-dist/assets/coffee-*.js
+src/ui-dist/assets/cpp-*.js
+src/ui-dist/assets/csharp-*.js
+src/ui-dist/assets/csp-*.js
+src/ui-dist/assets/css-*.js
+src/ui-dist/assets/dart-*.js
+src/ui-dist/assets/dockerfile-*.js
+src/ui-dist/assets/ecl-*.js
+src/ui-dist/assets/elixir-*.js
+src/ui-dist/assets/flow9-*.js
+src/ui-dist/assets/freemarker-*.js
+src/ui-dist/assets/fsharp-*.js
+src/ui-dist/assets/go-*.js
+src/ui-dist/assets/graphql-*.js
+src/ui-dist/assets/handlebars-*.js
+src/ui-dist/assets/hcl-*.js
+src/ui-dist/assets/html-*.js
+src/ui-dist/assets/ini-*.js
+src/ui-dist/assets/java-*.js
+src/ui-dist/assets/javascript-*.js
+src/ui-dist/assets/julia-*.js
+src/ui-dist/assets/kotlin-*.js
+src/ui-dist/assets/less-*.js
+src/ui-dist/assets/lexon-*.js
+src/ui-dist/assets/liquid-*.js
+src/ui-dist/assets/lua-*.js
+src/ui-dist/assets/m3-*.js
+src/ui-dist/assets/markdown-*.js
+src/ui-dist/assets/mdx-*.js
+src/ui-dist/assets/mips-*.js
+src/ui-dist/assets/msdax-*.js
+src/ui-dist/assets/mysql-*.js
+src/ui-dist/assets/objective-*.js
+src/ui-dist/assets/pascal-*.js
+src/ui-dist/assets/pascaligo-*.js
+src/ui-dist/assets/perl-*.js
+src/ui-dist/assets/pgsql-*.js
+src/ui-dist/assets/php-*.js
+src/ui-dist/assets/postiats-*.js
+src/ui-dist/assets/powerquery-*.js
+src/ui-dist/assets/powershell-*.js
+src/ui-dist/assets/protobuf-*.js
+src/ui-dist/assets/pug-*.js
+src/ui-dist/assets/python-*.js
+src/ui-dist/assets/qsharp-*.js
+src/ui-dist/assets/r-*.js
+src/ui-dist/assets/razor-*.js
+src/ui-dist/assets/redis-*.js
+src/ui-dist/assets/redshift-*.js
+src/ui-dist/assets/restructuredtext-*.js
+src/ui-dist/assets/ruby-*.js
+src/ui-dist/assets/rust-*.js
+src/ui-dist/assets/sb-*.js
+src/ui-dist/assets/scala-*.js
+src/ui-dist/assets/scheme-*.js
+src/ui-dist/assets/scss-*.js
+src/ui-dist/assets/shell-*.js
+src/ui-dist/assets/solidity-*.js
+src/ui-dist/assets/sophia-*.js
+src/ui-dist/assets/sql-*.js
+src/ui-dist/assets/st-*.js
+src/ui-dist/assets/swift-*.js
+src/ui-dist/assets/systemverilog-*.js
+src/ui-dist/assets/tcl-*.js
+src/ui-dist/assets/twig-*.js
+src/ui-dist/assets/typescript-*.js
+src/ui-dist/assets/vb-*.js
+src/ui-dist/assets/xml-*.js
+src/ui-dist/assets/yaml-*.js
+
+# Keep only essential UI files
+!src/ui-dist
+!src/ui-dist/index.html
+!src/ui-dist/assets/index-*.js
+!src/ui-dist/assets/index-*.css
+!src/ui-dist/assets/vendor-*.js
+!src/ui-dist/assets/xterm-*.js
+!src/ui-dist/assets/xterm-*.css
+!src/ui-dist/assets/CodeEditor-*.js
+!src/ui-dist/assets/CodeEditor-*.css
+!src/ui-dist/assets/Events-*.js
+!src/ui-dist/assets/HandlerView-*.js
+!src/ui-dist/assets/HandlerView-*.css
+!src/ui-dist/assets/NotFound-*.js
+
+# Development scripts
+scripts/
+
+# Documentation source
+docs/
 
 # Misc
-docs/
-examples/ 
+*.log
+*.tgz
+.DS_Store
+node_modules/
+npm-debug.log* 

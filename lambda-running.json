@@ -1,0 +1,12 @@
+{
+  "layers": [],
+  "layerMappings": {},
+  "envFiles": [".env"],
+  "ignorePatterns": [
+    "**/*.test.js",
+    "**/*.spec.js",
+    "**/__tests__/**"
+  ],
+  "ignoreLayerFilesOnScan": true,
+  "debug": false
+} 

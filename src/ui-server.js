@@ -12,6 +12,7 @@ const chalk = require('chalk');
 const { scanForHandlers, runHandler } = require('./lambda-runner');
 const { saveEvent, getEvents, getEvent, deleteEvent } = require('./event-store');
 const path = require('path');
+const fs = require('fs');
 
 // Create an Express application
 const app = express();
@@ -20,22 +21,21 @@ let io;
 
 // Store running state
 let isRunning = false;
-let port = 3000;
 
-// Configurar funciones globales de logging
+// Configure global logging functions
 function setupGlobalLogging() {
-  // Función global para imprimir logs explícitos de Lambda
+  // Global function to print explicit Lambda logs
   global.lambdaLog = (...args) => {
     console.log(`[LAMBDA] ${args.join(' ')}`);
   };
-  
-  // Función global para imprimir logs de sistema (que serán filtrados y no aparecerán en el Output)
+
+  // Global function to print system logs (which will be filtered and won't appear in the Output)
   global.systemLog = (...args) => {
     console.info(`[SYSTEM] ${args.join(' ')}`);
   };
 }
 
-// Inicializar las funciones globales de logging
+// Initialize global logging functions
 setupGlobalLogging();
 
 // Handle console output capture for streaming to UI
@@ -47,14 +47,14 @@ class OutputCapture {
     this.originalConsoleError = console.error;
     this.originalConsoleWarn = console.warn;
     this.originalConsoleInfo = console.info;
-    
-    // Flag para marcar cuando estamos en modo captura
+
+    // Flag to mark when we are in capture mode
     this.isCapturing = false;
-    
-    // Flag para identificar si estamos en código de handler o librería
+
+    // Flag to identify if we are in handler code or library code
     this.inHandlerCode = false;
-    
-    // Lista de logs del sistema que deberíamos ignorar
+
+    // List of system logs that should be ignored
     this.systemLogs = [
       'Starting execution of handler:',
       'Loading environment variables from',
@@ -87,18 +87,18 @@ class OutputCapture {
       'Processing file',
       'Import resolver',
       'AWS SDK',
-      'Lambda Running'
+      'Lambda Running',
     ];
   }
 
   start() {
-    // Activar captura
+    // Activate capture
     this.isCapturing = true;
-    
-    // Emitir mensaje de inicio
+
+    // Emit start message
     this.emit('info', ['Lambda execution started']);
-    
-    // Sobrescribir métodos de consola para capturar todo durante la ejecución
+
+    // Override console methods to capture everything during execution
     console.log = (...args) => {
       this.originalConsoleLog(...args);
       this.processLog('log', args);
@@ -121,38 +121,38 @@ class OutputCapture {
   }
 
   stop() {
-    // Desactivar captura
+    // Deactivate capture
     this.isCapturing = false;
-    
-    // Restaurar métodos originales
+
+    // Restore original methods
     console.log = this.originalConsoleLog;
     console.error = this.originalConsoleError;
     console.warn = this.originalConsoleWarn;
     console.info = this.originalConsoleInfo;
   }
-  
-  // Método para procesar logs y filtrar los que son del sistema
+
+  // Method to process logs and filter system logs
   processLog(type, args) {
     if (!this.isCapturing) return;
-    
-    // Si es un log del sistema, no lo emitimos en absoluto
+
+    // If it's a system log, don't emit it at all
     if (this.isSystemLog(args)) {
       return;
     }
-    
-    // Verificar si el primer argumento es un objeto Error (incluyendo excepciones como AuthenticationException)
+
+    // Check if the first argument is an Error object (including exceptions like AuthenticationException)
     if (args.length > 0 && args[0] instanceof Error) {
       const error = args[0];
-      // Obtenemos el nombre real de la clase de error usando constructor.name que es más fiable
+      // Get the real name of the error class using constructor.name which is more reliable
       const errorName = error.constructor.name || error.name || 'Error';
-      
-      // Emitir el nombre de la excepción con formato especial
+
+      // Emit the exception name with special formatting
       this.emit('error', [`${errorName} [Error]`]);
-      
-      // Emitir el stack trace sin la primera línea (que contiene el nombre y mensaje)
+
+      // Emit the stack trace without the first line (which contains the name and message)
       if (error.stack) {
         const stackLines = error.stack.split('\n');
-        // Solo emitir las líneas del stack sin la primera que ya contiene el error
+        // Only emit stack lines without the first one that already contains the error
         if (stackLines.length > 1) {
           this.emit('error', [stackLines.slice(1).join('\n')]);
         }
@@ -161,95 +161,103 @@ class OutputCapture {
       }
       return;
     }
-    
-    // Capturas específicas para errores y excepciones - debemos asegurarnos de mostrarlos siempre
+
+    // Specific captures for errors and exceptions - we must ensure they are always shown
     if (type === 'error' && args.length > 0) {
-      // Si el primer argumento es una cadena que contiene un error específico o stack trace, 
-      // asegurarnos de mostrarlo incluso si contiene patrones de sistema
+      // If the first argument is a string that contains a specific error or stack trace,
+      // make sure to show it even if it contains system patterns
       const firstArg = String(args[0]);
-      
-      // Detectar patrones específicos de errores y excepciones
-      if (firstArg.includes('Error') || 
-          firstArg.includes('Exception') ||
-          firstArg.includes('at ') || // Líneas de stack trace
-          firstArg.includes('Failed') ||
-          firstArg.includes('Uncaught') ||
-          /^\s+at\s/.test(firstArg)) { // Líneas de stack trace con indentación
+
+      // Detect specific patterns for errors and exceptions
+      if (
+        firstArg.includes('Error') ||
+        firstArg.includes('Exception') ||
+        firstArg.includes('at ') || // Stack trace lines
+        firstArg.includes('Failed') ||
+        firstArg.includes('Uncaught') ||
+        /^\s+at\s/.test(firstArg)
+      ) {
+        // Stack trace lines with indentation
         this.emit('error', args);
         return;
       }
     }
-    
-    // Si llegamos aquí, el log es de la lambda y debemos emitirlo
+
+    // If we get here, the log is from the lambda and should be emitted
     this.emit(type, args);
   }
-  
-  // Método para determinar si un log es del sistema
+
+  // Method to determine if a log is from the system
   isSystemLog(args) {
     if (args.length === 0) return false;
-    
-    // Si el primer argumento es un Error, NUNCA debe ser considerado un log del sistema
+
+    // If the first argument is an Error, it should NEVER be considered a system log
     if (args[0] instanceof Error) {
       return false;
     }
-    
-    // Obtener el primer argumento como string para evaluarlo
+
+    // Get the first argument as string for evaluation
     const firstArg = String(args[0]);
-    
-    // Si el log comienza con [SYSTEM], es un log de sistema y debe ser filtrado
+
+    // If the log starts with [SYSTEM], it's a system log and should be filtered
     if (typeof firstArg === 'string' && firstArg.startsWith('[SYSTEM]')) {
       return true;
     }
-    
-    // Los errores y excepciones nunca deben ser considerados logs del sistema
-    if (typeof firstArg === 'string' && 
-        (firstArg.includes('Error') || 
-         firstArg.includes('Exception') || 
-         firstArg.includes('at ') ||  // Para detectar líneas de stack trace
-         /^\s+at\s/.test(firstArg))) {  // Para detectar líneas de stack trace con indentación
+
+    // Errors and exceptions should never be considered system logs
+    if (
+      typeof firstArg === 'string' &&
+      (firstArg.includes('Error') ||
+        firstArg.includes('Exception') ||
+        firstArg.includes('at ') || // To detect stack trace lines
+        /^\s+at\s/.test(firstArg))
+    ) {
+      // To detect stack trace lines with indentation
       return false;
     }
-    
-    // Si el log comienza con [LAMBDA], no es del sistema (es un log explícito del usuario)
+
+    // If the log starts with [LAMBDA], it's not from the system (it's an explicit user log)
     if (typeof firstArg === 'string' && firstArg.startsWith('[LAMBDA]')) {
-      // Quitamos el prefijo para que se vea más limpio
+      // Remove the prefix for cleaner output
       args[0] = firstArg.substring('[LAMBDA]'.length).trim();
       return false;
     }
-    
-    // Si el mensaje proviene de un handler lambda, permitirlo
+
+    // If the message comes from a lambda handler, allow it
     if (this.inHandlerCode) {
       return false;
     }
-    
-    // Verificar contra patrones conocidos de logs del sistema
+
+    // Check against known system log patterns
     for (const systemLogPrefix of this.systemLogs) {
       if (typeof firstArg === 'string' && firstArg.includes(systemLogPrefix)) {
         return true;
       }
     }
-    
-    // Patrones adicionales basados en análisis de logs
-    // Verificar si es un log interno de la librería
+
+    // Additional patterns based on log analysis
+    // Check if it's an internal library log
     if (
-      (typeof firstArg === 'string' && /^\[.*?\]/.test(firstArg) && !firstArg.startsWith('[LAMBDA]')) ||  // Logs con formato [ALGO] que no sea [LAMBDA]
+      (typeof firstArg === 'string' &&
+        /^\[.*?\]/.test(firstArg) &&
+        !firstArg.startsWith('[LAMBDA]')) || // Logs with [SOMETHING] format that are not [LAMBDA]
       firstArg.includes('lambda-running') ||
       firstArg.includes('Lambda Running') ||
-      firstArg.includes('node_modules') || 
-      firstArg.includes('Starting') || 
-      firstArg.includes('Importing') || 
+      firstArg.includes('node_modules') ||
+      firstArg.includes('Starting') ||
+      firstArg.includes('Importing') ||
       firstArg.includes('Loading')
     ) {
       return true;
     }
-    
+
     return false;
   }
 
   emit(type, args) {
     // Format and emit log messages to the client
     const formattedArgs = args.map((arg) => {
-      // No intentar JSON.stringify en objetos Error
+      // No attempt to JSON.stringify Error objects
       if (typeof arg === 'object' && arg !== null && !(arg instanceof Error)) {
         try {
           return JSON.stringify(arg, null, 2);
@@ -257,44 +265,42 @@ class OutputCapture {
           return String(arg);
         }
       }
-      
-      // Convertir a string preservando el formato original
+
+      // Convert to string preserving original format
       return String(arg);
     });
 
-    // Combinar argumentos en un mensaje
+    // Combine arguments into a message
     let message = formattedArgs.join(' ');
-    
-    // Eliminar TODOS los timestamps en CUALQUIER formato
-    message = message.replace(/\[\d{2}:\d{2}:\d{2}\]\s*/g, '');       // [HH:MM:SS]
-    message = message.replace(/\d{2}:\d{2}:\d{2}\s*/g, '');           // HH:MM:SS sin corchetes
-    message = message.replace(/^\s*Error\s*$/i, '');                  // Solo la palabra "Error" sola
-    
-    // Si después de limpiar el mensaje queda vacío, no enviarlo
+
+    // Remove ALL timestamps in ANY format
+    message = message.replace(/\[\d{2}:\d{2}:\d{2}\]\s*/g, ''); // [HH:MM:SS]
+    message = message.replace(/\d{2}:\d{2}:\d{2}\s*/g, ''); // HH:MM:SS without brackets
+    message = message.replace(/^\s*Error\s*$/i, ''); // Just the word "Error" alone
+
+    // If after cleaning the message is empty, don't send it
     if (!message.trim()) {
       return;
     }
-    
-    // Detectar si es un mensaje de excepción para aplicar formato especial
+
+    // Detect if it's an exception message to apply special formatting
     let errorClass = '';
-    
-    // Detectar diferentes tipos de mensajes de error
+
+    // Detect different types of error messages
     if (type === 'error') {
-      // Encontrar el tipo de mensaje de error
+      // Find the type of error message
       if (message.includes('[Error]')) {
-        // Es una línea con el nombre de la excepción
+        // It's a line with the exception name
         errorClass = 'error-message-heading';
-      } 
-      else if (message.trim().startsWith('at ') || /^\s+at\s/.test(message)) {
-        // Es una línea de stack trace
+      } else if (message.trim().startsWith('at ') || /^\s+at\s/.test(message)) {
+        // It's a stack trace line
         errorClass = 'stack-trace';
-      }
-      else {
-        // Mensaje de error genérico
+      } else {
+        // Generic error message
         errorClass = 'error-message';
       }
     }
-    
+
     this.socket.emit('console', {
       type,
       message,
@@ -312,204 +318,47 @@ async function start(options = {}) {
     return;
   }
 
-  port = options.port || 3000;
-  const cwd = options.cwd || process.cwd();
+  const startOptions = options || {};
+  const port = startOptions.port || 3000;
+  const shouldOpenBrowser = startOptions.open !== false;
+  const projectDir = startOptions.cwd || process.cwd();
+  const developmentMode = startOptions.developmentMode !== false;
+  const moduleRoot = startOptions.moduleRoot || path.dirname(__dirname);
+  
+  // Log startup mode
+  if (developmentMode) {
+    global.systemLog('Starting in development mode (with hot reloading)');
+  } else {
+    global.systemLog('Starting in production mode (serving compiled files)');
+  }
 
   // Configure middleware
   app.use(cors());
   app.use(express.json());
 
-  // Static file serving will be added here once we build the frontend
-  // For now, we'll just serve a placeholder page
-  app.get('/', (req, res) => {
-    res.send(`
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Lambda Running UI</title>
-        <style>
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: #1e1e1e;
-            color: #e1e1e1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            padding: 20px;
-            text-align: center;
-          }
-          h1 {
-            color: #7e57c2;
-            margin-bottom: 1rem;
-          }
-          p {
-            max-width: 600px;
-            line-height: 1.6;
-          }
-          .loading {
-            margin-top: 2rem;
-            font-style: italic;
-            color: #888;
-          }
-          /* Estilos para mensajes de error */
-          .error-message {
-            color: #ff5252;
-            font-weight: bold;
-            white-space: pre-wrap;
-            font-family: monospace;
-            text-align: left;
-            padding: 10px;
-            background-color: rgba(255, 0, 0, 0.05);
-            border-left: 4px solid #ff5252;
-            margin: 8px 0;
-            overflow-x: auto;
-            display: block;
-            width: calc(100% - 20px);
-          }
-          
-          /* Enfatizar la línea con el nombre de la excepción */
-          .error-message-heading {
-            color: #ff3333;
-            font-size: 1.2em;
-            font-weight: bold;
-            font-family: monospace;
-            background-color: rgba(255, 0, 0, 0.1);
-            padding: 12px 10px;
-            margin: 15px 0 0 0;
-            border-left: 4px solid #ff3333;
-            border-top-left-radius: 3px;
-            border-top-right-radius: 3px;
-            text-align: left;
-            display: block;
-          }
-          
-          /* Stack trace con formato adecuado */
-          .stack-trace {
-            white-space: pre;
-            font-family: monospace;
-            color: #ff7777;
-            margin: 0;
-            padding: 5px 10px 5px 20px;
-            font-size: 0.9em;
-            background-color: rgba(255, 0, 0, 0.03);
-            border-left: 4px solid rgba(255, 82, 82, 0.5);
-            text-align: left;
-            display: block;
-          }
-        </style>
-      </head>
-      <body>
-        <h1>Lambda Running UI</h1>
-        <p>The full UI is coming soon. We're working on an elegant, powerful interface for testing your Lambda functions.</p>
-        <p class="loading">Loading resources...</p>
-        
-        <script>
-          // Simple script to connect to WebSocket for basic demo
-          const socket = new WebSocket('ws://' + window.location.host + '/socket.io/?EIO=4&transport=websocket');
-          
-          // Contenedor principal para los mensajes
-          let outputContainer;
-          
-          socket.onopen = () => {
-            console.log('Connected to server');
-            const loadingElement = document.querySelector('.loading');
-            loadingElement.textContent = 'Connected to server! Full UI coming soon.';
-            
-            // Crear un contenedor específico para la salida
-            outputContainer = document.createElement('div');
-            outputContainer.className = 'output-container';
-            outputContainer.style.cssText = 'width: 100%; max-width: 900px; text-align: left; margin-top: 20px; padding: 10px; background-color: #2d2d2d; border-radius: 4px; overflow: auto; max-height: 70vh;';
-            loadingElement.parentNode.insertBefore(outputContainer, loadingElement.nextSibling);
-            
-            // Escuchar eventos de consola
-            socket.addEventListener('message', (event) => {
-              try {
-                const data = JSON.parse(event.data);
-                
-                // Procesar eventos de consola
-                if (data.type === 'console') {
-                  const consoleData = data.data;
-                  
-                  // Eliminar cualquier timestamp que pueda tener el mensaje
-                  let message = consoleData.message;
-                  message = message.replace(/\[\d{2}:\d{2}:\d{2}\]\s*/g, '');    // [HH:MM:SS]
-                  message = message.replace(/\d{2}:\d{2}:\d{2}\s*/g, '');        // HH:MM:SS sin corchetes
-                  message = message.replace(/^\s*Error\s*$/i, '');               // Solo la palabra "Error" sola
-                  
-                  // Si después de limpiar el mensaje queda vacío, ignorarlo
-                  if (!message.trim()) return;
-                  
-                  // Crear elemento de mensaje
-                  const messageEl = document.createElement('div');
-                  
-                  // Aplicar la clase CSS específica si viene del servidor
-                  if (consoleData.errorClass) {
-                    messageEl.className = consoleData.errorClass;
-                  } 
-                  // O determinar el tipo de mensaje basado en su contenido
-                  else if (consoleData.type === 'error') {
-                    // Por defecto, todo mensaje de error tiene la clase base
-                    messageEl.className = 'error-message';
-                    
-                    // Detectar tipos específicos de errores
-                    if (message.includes('[Error]') || 
-                        /^[A-Z][a-zA-Z]+Exception/.test(message)) {
-                      // Es una línea con el nombre de la excepción
-                      messageEl.className = 'error-message-heading';
-                    } 
-                    else if (message.trim().startsWith('at ') || 
-                            /^\s+at\s/.test(message) ||
-                            (message.includes('.ts:') && message.includes(':')) ||
-                            (message.includes('.js:') && message.includes(':'))) {
-                      // Es una línea de stack trace
-                      messageEl.className = 'stack-trace';
-                    }
-                  }
-                  
-                  // Establecer el texto del mensaje
-                  messageEl.textContent = message;
-                  
-                  // Añadir al contenedor
-                  outputContainer.appendChild(messageEl);
-                  
-                  // Auto-scroll hasta el último mensaje
-                  outputContainer.scrollTop = outputContainer.scrollHeight;
-                }
-              } catch (e) {
-                console.error('Error parsing message:', e);
-              }
-            });
-          };
-          
-          socket.onclose = () => {
-            console.log('Disconnected from server');
-            document.querySelector('.loading').textContent = 'Disconnected from server.';
-          };
-        </script>
-      </body>
-      </html>
-    `);
+  // Configure API endpoints first - these need to be available in all modes
+  
+  // Simple healthcheck endpoint
+  app.get('/api/healthcheck', (req, res) => {
+    res.json({ 
+      status: 'ok', 
+      mode: developmentMode ? 'development' : 'production',
+      timestamp: new Date().toISOString()
+    });
   });
-
-  // API endpoints
 
   // Get all Lambda handlers
   app.get('/api/handlers', (req, res) => {
     try {
-      const handlers = scanForHandlers(cwd, ['.js', '.ts'], {
+      const handlers = scanForHandlers(projectDir, ['.js', '.ts'], {
         ignoreNodeModules: true,
         useIgnoreFile: true,
       });
 
-      // Transform paths to be relative to cwd
-      const handlersWithRelativePaths = handlers.map(handler => ({
+      // Transform paths to be relative to projectDir
+      const handlersWithRelativePaths = handlers.map((handler) => ({
         ...handler,
-        path: path.relative(cwd, handler.path).replace(/\\/g, '/') // Convert Windows backslashes to forward slashes
+        path: path.relative(projectDir, handler.path).replace(/\\/g, '/'), // Convert Windows backslashes to forward slashes
       }));
 
       res.json({ handlers: handlersWithRelativePaths });
@@ -638,6 +487,52 @@ async function start(options = {}) {
     }
   });
 
+  // Now configure UI serving based on mode
+  if (developmentMode) {
+    global.systemLog('Development mode active, API server only (UI will be served by Vite)');
+  } else {
+    // Production mode - Serve UI from lib/ui-dist
+    const uiDistPath = path.join(moduleRoot, 'lib', 'ui-dist');
+    global.systemLog(`Serving UI from bundled files at ${uiDistPath}`);
+    
+    if (fs.existsSync(uiDistPath) && fs.existsSync(path.join(uiDistPath, 'index.html'))) {
+      global.systemLog(`UI static files found at ${uiDistPath}`);
+      
+      // Serve static files with proper cache control
+      app.use(express.static(uiDistPath, {
+        etag: true,
+        lastModified: true,
+        setHeaders: (res) => {
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+        }
+      }));
+      
+      // Handle root path explicitly - redirect to handlers view
+      app.get('/', (req, res) => {
+        res.redirect('/handlers');
+      });
+      
+      // Handle all assets with explicit paths
+      app.get('/assets/*', (req, res) => {
+        const assetPath = path.join(uiDistPath, req.path);
+        if (fs.existsSync(assetPath)) {
+          res.sendFile(assetPath);
+        } else {
+          global.systemLog(`Asset not found: ${assetPath}`);
+          res.status(404).send('Asset not found');
+        }
+      });
+      
+      // Serve index.html for all non-API routes (SPA routing)
+      app.get('*', (req, res, next) => {
+        if (req.path.startsWith('/api/')) {
+          return next();
+        }
+        res.sendFile(path.join(uiDistPath, 'index.html'));
+      });
+    }
+  }
+
   // Create HTTP server and Socket.io instance
   server = http.createServer(app);
   io = new Server(server);
@@ -645,7 +540,7 @@ async function start(options = {}) {
   // Socket.io connection handling
   io.on('connection', (socket) => {
     global.systemLog('Client connected to UI');
-    
+
     // Store the current execution context to allow cancellation
     let currentExecutionContext = null;
 
@@ -656,34 +551,27 @@ async function start(options = {}) {
       // Capture console output
       const outputCapture = new OutputCapture(socket, sessionId);
       outputCapture.start();
-      
+
       // Store the execution context
       currentExecutionContext = {
         sessionId,
         outputCapture,
-        canceled: false
+        canceled: false,
       };
 
       try {
         socket.emit('execution-start', { sessionId });
 
-        // Mensaje de inicio de ejecución - usando systemLog para que no aparezca en Output
-        global.systemLog(`Starting execution of ${path.basename(handlerPath)} -> ${handlerMethod}`);
-        
-        const startTime = Date.now();
-        
-        // Allow the execution to be canceled
-        if (currentExecutionContext.canceled) {
-          throw new Error('Execution canceled by user');
-        }
-        
-        // Mostrar información del evento (usando systemLog)
+        // Display event information (using systemLog)
         global.systemLog(`Event data: ${JSON.stringify(eventData || {}, null, 2)}`);
-        
-        // Aquí comienza la ejecución real del handler del usuario
-        // Marcar que estamos dentro del código del handler
+
+        // Here begins the actual execution of the user's handler
+        // Mark that we are inside the handler code
         outputCapture.inHandlerCode = true;
-        
+
+        // Define startTime to measure execution duration
+        const startTime = Date.now();
+
         let result;
         try {
           result = await runHandler(
@@ -696,55 +584,50 @@ async function start(options = {}) {
             }
           );
         } catch (handlerError) {
-          // Capturar explícitamente el error del handler y procesarlo
-          
-          // Loguear directamente el error para asegurar que se muestre en el Output
-          console.log("ERROR DETECTADO EN LAMBDA:");
-          
-          // Si es un objeto Error, mostrar todos sus detalles
+          // Explicitly catch the handler error and process it
+          // If it's an Error object, show all its details
           if (handlerError instanceof Error) {
             console.log(`ERROR: ${handlerError.name || 'Error'}: ${handlerError.message}`);
-            
-            // Para errores como AuthenticationException, sus propiedades podrían ser relevantes
-            // Mostramos todas las propiedades enumerables del error
+
+            // Show all enumerable properties of the error
             const errorProps = Object.keys(handlerError)
-              .filter(key => key !== 'name' && key !== 'message' && key !== 'stack')
+              .filter((key) => key !== 'name' && key !== 'message' && key !== 'stack')
               .reduce((obj, key) => {
                 obj[key] = handlerError[key];
                 return obj;
               }, {});
-              
+
             if (Object.keys(errorProps).length > 0) {
-              console.log("Error properties:", errorProps);
+              console.log('Error properties:', errorProps);
             }
-            
-            // Imprimir el stack trace completo
+
+            // Print the complete stack trace
             if (handlerError.stack) {
               console.log(handlerError.stack);
             }
           } else {
-            // Si no es un objeto Error, mostrarlo tal cual
+            // If it's not an Error object, show it as is
             console.log(handlerError);
           }
-          
-          // Re-lanzar para el manejo posterior
+
+          // Re-throw for subsequent handling
           throw handlerError;
         }
-        
-        // Al terminar la ejecución, volvemos a estar en código de librería
+
+        // After the execution is finished, we are back in library code
         outputCapture.inHandlerCode = false;
-        
+
         const duration = Date.now() - startTime;
-        
+
         // Check if execution was canceled during the run
         if (currentExecutionContext.canceled) {
           throw new Error('Execution canceled by user');
         }
 
-        // Mensaje de finalización exitosa (usando systemLog)
+        // Successful completion message (using systemLog)
         global.systemLog(`Execution completed in ${(duration / 1000).toFixed(2)}s`);
         global.systemLog('Execution completed successfully');
-        
+
         socket.emit('execution-result', {
           success: true,
           result,
@@ -754,51 +637,48 @@ async function start(options = {}) {
       } catch (error) {
         // Check if this was a cancellation
         if (currentExecutionContext && currentExecutionContext.canceled) {
-          // Mensaje de cancelación
+          // Cancellation message
           global.systemLog('Execution was cancelled by user');
           socket.emit('execution-stopped', { sessionId });
         } else {
-          // Marcar que estamos de vuelta en código de librería
+          // Mark that we are back in library code
           outputCapture.inHandlerCode = false;
-          
-          // Emitir explícitamente el mensaje de error
-          console.log(`Error en la ejecución: ${error.message}`);
-          
-          // Para garantizar que los errores se muestren en el output,
-          // enviamos el error directamente al terminal con el formato adecuado
+
+          // To ensure errors are displayed in the output,
+          // we send the error directly to the terminal with the appropriate format
           socket.emit('console', {
             type: 'error',
             message: `Error: ${error.message}`,
             errorClass: 'error-message',
             timestamp: new Date().toISOString(),
-            sessionId
+            sessionId,
           });
-          
-          // Si hay stack trace, enviarlo también
+
+          // If there is a stack trace, send it also
           if (error.stack) {
             socket.emit('console', {
               type: 'error',
               message: error.stack,
               errorClass: 'error-message',
               timestamp: new Date().toISOString(),
-              sessionId
+              sessionId,
             });
           }
-          
-          // Si es un error específico como AuthenticationException, asegurarnos de capturarlo
+
+          // If it's a specific error like AuthenticationException, ensure it's captured
           if (error.name && error.name !== 'Error') {
             socket.emit('console', {
               type: 'error',
               message: `Exception: ${error.name}: ${error.message}`,
               errorClass: 'error-message',
               timestamp: new Date().toISOString(),
-              sessionId
+              sessionId,
             });
           }
-          
-          // Mensaje de error (usando systemLog)
+
+          // Error message (using systemLog)
           global.systemLog(`Execution failed: ${error.message}`);
-          
+
           socket.emit('execution-result', {
             success: false,
             error: {
@@ -814,26 +694,26 @@ async function start(options = {}) {
         currentExecutionContext = null;
       }
     });
-    
+
     // Handle stop execution request
     socket.on('stop-execution', (data) => {
       const { sessionId } = data;
-      
+
       // Only cancel if there's a running execution with matching sessionId
       if (currentExecutionContext && currentExecutionContext.sessionId === sessionId) {
         console.log(chalk.yellow(`Execution stopped by user for session ${sessionId}`));
-        
+
         // Mark as canceled
         currentExecutionContext.canceled = true;
-        
+
         // Send an immediate console message
         socket.emit('console', {
           type: 'warn',
           message: 'Execution was stopped by user',
           timestamp: Date.now(),
-          sessionId
+          sessionId,
         });
-        
+
         // Send the stopped event
         socket.emit('execution-stopped', { sessionId });
       }
@@ -850,8 +730,9 @@ async function start(options = {}) {
       isRunning = true;
       global.systemLog(`Lambda Running UI server started on http://localhost:${port}`);
 
-      if (options.open) {
-        open(`http://localhost:${port}`);
+      if (shouldOpenBrowser) {
+        // Open directly to handlers route for better UX
+        open(`http://localhost:${port}/handlers`);
       }
 
       resolve();
@@ -889,4 +770,8 @@ async function stop() {
 module.exports = {
   start,
   stop,
+  __test_only_for_coverage__: {
+    OutputCapture
+  }
 };
+

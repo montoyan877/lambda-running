@@ -8,7 +8,7 @@
         <h2 class="card-title">Handlers</h2>
         <div class="mt-4">
           <div class="text-4xl font-bold">{{ handlerCount }}</div>
-          <div class="text-sm text-gray-400 mt-1">Functions available</div>
+          <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">Functions available</div>
         </div>
         
         <div class="mt-6">
@@ -23,7 +23,7 @@
         <h2 class="card-title">Events</h2>
         <div class="mt-4">
           <div class="text-4xl font-bold">{{ eventCount }}</div>
-          <div class="text-sm text-gray-400 mt-1">Saved events</div>
+          <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">Saved events</div>
         </div>
         
         <div class="mt-6">
@@ -45,7 +45,7 @@
             {{ getHandlerName(recentHandler) }}
           </button>
           
-          <div v-else class="text-gray-400 text-sm">
+          <div v-else class="text-gray-500 dark:text-gray-400 text-sm">
             No recent handlers
           </div>
         </div>
@@ -170,7 +170,7 @@ export default defineComponent({
       if (!handler) return ''
       
       const pathParts = handler.path.split('/')
-      return `${pathParts[pathParts.length - 1]} -> ${handler.method}`
+      return `${pathParts[pathParts.length - 1]}`
     }
     
     const goToHandler = (handler) => {
