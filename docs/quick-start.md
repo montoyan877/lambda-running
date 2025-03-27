@@ -4,7 +4,7 @@ This guide will help you get started with Lambda Running in just a few minutes.
 
 ## 📋 Prerequisites
 
-- Node.js 14.x or later
+- Node.js 20.x or later
 - npm 6.x or later
 - An AWS Lambda project (or create a new one)
 
