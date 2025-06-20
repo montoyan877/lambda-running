@@ -92,13 +92,8 @@ Enable AWS Lambda layers support by creating a `lambda-running.json` file in you
 
 ```json
 {
-  "layers": [
-    "my-common-layer",
-    "my-utils-layer"
-  ],
   "layerMappings": {
-    "/opt/nodejs/aws-sdk": "./node_modules/aws-sdk",
-    "/opt/nodejs/axios": "./node_modules/axios"
+    "/opt/nodejs": "layers/common",
   },
   "envFiles": [
     ".env",
@@ -112,27 +107,18 @@ Enable AWS Lambda layers support by creating a `lambda-running.json` file in you
 }
 ```
 
-For a simple layers setup, just specify layer names:
+This will automatically map `/opt/nodejs` to `./layers/common` in your project.
 
-```json
-{
-  "layers": ["general"]
-}
-```
-
-This will automatically map `/opt/nodejs/general` to `./layers/general` in your project.
-
-Your local project structure should match AWS Lambda's layer structure:
+Your local project structure should match this structure:
 
 ```
 my-project/
 ├── lambdarunning.config.json
 ├── handler.js (imports from /opt/nodejs/...)
 └── layers/
-    └── general/
-        └── nodejs/
-            └── utils/
-                └── index.js
+    └── common/
+        └── utils/
+            └── index.js
 ```
 
 > ⚠️ **Important**: Lambda Layers support currently only works for local development. You must download the layer code and place it in your project directory as shown above. This feature does not fetch layers from AWS cloud.
@@ -141,8 +127,7 @@ my-project/
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `layers` | Array | `[]` | Simple array of layer names that will be mapped to the `./layers/{name}` directory |
-| `layerMappings` | Object | `{}` | Detailed mappings from Lambda layer paths to local directories |
+`layerMappings` | Object | `{}` | Detailed mappings from Lambda layer paths to local directories |
 | `envFiles` | Array | `['.env']` | List of environment files to load (in order of precedence) |
 | `ignorePatterns` | Array | `[]` | Additional glob patterns to ignore when scanning for handlers |
 | `ignoreLayerFilesOnScan` | Boolean | `true` | Whether to ignore files in the layers directory when scanning for handlers |

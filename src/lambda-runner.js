@@ -358,11 +358,12 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
       throw new Error(`Handler file not found: ${absolutePath}`);
     }
 
-    // Clear cache to reload the handler if it's been changed
-    try {
-      delete require.cache[require.resolve(absolutePath)];
-    } catch (e) {
-      // Ignore errors when clearing cache
+    // Clear ALL require cache to ensure fresh reloads of all modules
+    for (const key in require.cache) {
+      // Skip node_modules to avoid unnecessary reloads
+      if (!key.includes('node_modules')) {
+        delete require.cache[key];
+      }
     }
 
     // Import the handler
