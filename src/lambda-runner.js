@@ -359,10 +359,43 @@ async function runHandler(handlerPath, handlerMethod, event, context = {}, optio
     }
 
     // Clear ALL require cache to ensure fresh reloads of all modules
+    // This is especially important for TypeScript files and their dependencies
+    const projectDir = process.cwd();
     for (const key in require.cache) {
-      // Skip node_modules to avoid unnecessary reloads
-      if (!key.includes('node_modules')) {
-        delete require.cache[key];
+      // Skip node_modules to avoid unnecessary reloads, except for local modules
+      // that might be symlinked (npm link) or in node_modules
+      if (!key.includes('node_modules') || 
+          // Include modules that are in the current project directory even if in node_modules
+          // This helps with npm link scenarios
+          (key.includes(projectDir) && !key.includes('node_modules/typescript') && 
+           !key.includes('node_modules/@types'))) {
+        try {
+          delete require.cache[key];
+        } catch (e) {
+          // Ignore errors when clearing cache
+          if (lambdaRunningConfig.debug) {
+            global.systemLog(`Failed to clear cache for ${key}: ${e.message}`);
+          }
+        }
+      }
+    }
+
+    // Special handling for TypeScript files - ensure they're recompiled
+    if (isTypeScript) {
+      // Force recompilation by clearing ts-node cache if available
+      try {
+        const tsNode = require('ts-node');
+        if (tsNode && tsNode.register && tsNode.register.cache) {
+          tsNode.register.cache.clear();
+          if (lambdaRunningConfig.debug) {
+            global.systemLog('Cleared ts-node compilation cache');
+          }
+        }
+      } catch (e) {
+        // Ignore errors when clearing ts-node cache
+        if (lambdaRunningConfig.debug) {
+          global.systemLog(`Note: ts-node cache clearing failed: ${e.message}`);
+        }
       }
     }
 
