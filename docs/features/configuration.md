@@ -22,7 +22,6 @@ Or create it manually with the following structure:
 
 ```json
 {
-  "layers": [],
   "layerMappings": {},
   "envFiles": [".env"],
   "ignorePatterns": [
@@ -73,20 +72,6 @@ coverage
 
 ## Configuration Options
 
-### Layers
-
-The `layers` array defines Lambda layers to be resolved. Each entry should be the name of a layer which will be mapped to a local directory.
-
-```json
-{
-  "layers": ["my-common-layer", "my-utils-layer"]
-}
-```
-
-With this configuration, Lambda Running will:
-- Look for these layers in the `layers/` directory of your project
-- Map imports like `/opt/nodejs/my-common-layer` to `./layers/my-common-layer`
-
 ### Layer Mappings
 
 For more specific layer mappings, use the `layerMappings` object:
@@ -94,15 +79,13 @@ For more specific layer mappings, use the `layerMappings` object:
 ```json
 {
   "layerMappings": {
-    "/opt/nodejs/custom-path": "./local/path/to/layer",
-    "my-layer": "./src/layers/my-layer"
+    "/opt/nodejs": "layers/common",
   }
 }
 ```
 
 This configuration allows you to:
-- Map any path starting with `/opt/nodejs/custom-path` to `./local/path/to/layer`
-- Map imports like `/opt/nodejs/my-layer` to `./src/layers/my-layer`
+- Map imports like `/opt/nodejs` to `./src/layers/common`
 
 ### Environment Files
 
@@ -147,8 +130,7 @@ Enable debug mode for more verbose logging:
 
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
-| `layers` | Array | Simple array of layer names to map | `[]` |
-| `layerMappings` | Object | Maps Lambda layer paths to local directories | `{}` |
+`layerMappings` | Object | Maps Lambda layer paths to local directories | `{}` |
 | `envFiles` | Array | List of environment files to load | `['.env']` |
 | `ignorePatterns` | Array | Glob patterns for files to ignore when scanning for handlers | `[]` |
 | `ignoreLayerFilesOnScan` | Boolean | Whether to ignore layer files when scanning | `true` |
@@ -180,7 +162,6 @@ You can have different configurations in different directories. Lambda Running w
 
 ```json
 {
-  "layers": ["common-utils"],
   "envFiles": [".env", ".env.dev"],
   "debug": true
 }
@@ -203,7 +184,6 @@ You can have different configurations in different directories. Lambda Running w
 
 ```json
 {
-  "layers": ["data-layer", "api-layer"],
   "layerMappings": {
     "/opt/nodejs/aws-sdk": "./node_modules/aws-sdk",
     "/opt/nodejs/axios": "./node_modules/axios"

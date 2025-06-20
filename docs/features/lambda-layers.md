@@ -41,28 +41,10 @@ my-project/
 
 Create a `lambda-running.json` file in your project root with your layer configuration:
 
-#### Simple Configuration
-
-For basic setups, just list your layer names:
-
-```json
-{
-  "layers": ["my-layer"]
-}
-```
-
-This automatically maps:
-- `/opt/nodejs/my-layer` to `./layers/my-layer` in your project
-
-#### Advanced Configuration
-
-For more control, use the `layerMappings` property:
-
 ```json
 {
   "layerMappings": {
-    "/opt/nodejs/my-layer": "./layers/my-custom-location",
-    "/opt/nodejs/aws-sdk": "./node_modules/aws-sdk"
+    "/opt/nodejs": "layers/common",
   }
 }
 ```
@@ -93,33 +75,6 @@ lambda-run run ./handlers/my-handler.js handler --event '{"data":"test"}'
 ```
 
 ## 🔧 Advanced Layer Features
-
-### Multiple Layers
-
-You can use multiple layers in a single project:
-
-```json
-{
-  "layers": [
-    "common-utils",
-    "data-layer",
-    "api-layer"
-  ]
-}
-```
-
-### NPM Module Mapping
-
-You can map NPM modules to layer paths, avoiding duplication:
-
-```json
-{
-  "layerMappings": {
-    "/opt/nodejs/lodash": "./node_modules/lodash",
-    "/opt/nodejs/axios": "./node_modules/axios"
-  }
-}
-```
 
 ### Layer Scanning Control
 
@@ -156,7 +111,6 @@ If you're having trouble with layer imports, set `"debug": true` in your configu
 
 ```json
 {
-  "layers": ["my-layer"],
   "debug": true
 }
 ```
