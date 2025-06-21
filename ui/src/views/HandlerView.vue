@@ -557,6 +557,17 @@ export default defineComponent({
         }
       }
       
+      // Save shortcut - Ctrl+S or Cmd+S (for macOS)
+      if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+        // Prevent default browser save
+        event.preventDefault();
+        
+        // Save event if possible
+        if (!isExecuting.value && eventData.value) {
+          handleSaveClick();
+        }
+      }
+      
       // Format shortcut - normalize the key case for consistency
       const key = event.key.toUpperCase();
       if ((event.altKey && event.shiftKey && key === 'F') || 
