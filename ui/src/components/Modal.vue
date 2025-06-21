@@ -62,7 +62,7 @@ export default defineComponent({
     },
     closeOnClickOutside: {
       type: Boolean,
-      default: true
+      default: false
     }
   },
   

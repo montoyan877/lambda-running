@@ -33,7 +33,6 @@ This guide helps you resolve common issues that might arise when using Lambda Ru
 
 **Solutions**:
 - Check that the file exists at the expected location (default: `lambda-running.json` in current directory)
-- Specify the path explicitly: `lambda-run --config ./path/to/config.json`
 - Create a new configuration file: `lambda-run init`
 
 #### Environment Variables Not Loading
@@ -55,7 +54,7 @@ This guide helps you resolve common issues that might arise when using Lambda Ru
 - Check the path to the handler file is correct
 - Ensure the function is properly exported (e.g., `exports.handler = async (event) => {...}`)
 - For TypeScript files, ensure they are compiled before running
-- Try specifying the full path: `lambda-run ./path/to/file.js handlerName`
+- Try specifying the full path: `lambda-run run ./path/to/file.js`
 
 #### Module Import Errors
 

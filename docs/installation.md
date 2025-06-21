@@ -150,7 +150,7 @@ To verify everything is working correctly:
 lambda-run --version
 
 # Run a test function (if you have one)
-lambda-run ./test-handler.js
+lambda-run run ./test-handler.js
 ```
 
 Start the UI server:

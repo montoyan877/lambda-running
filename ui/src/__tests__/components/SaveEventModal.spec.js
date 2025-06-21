@@ -7,11 +7,15 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import SaveEventModal from '../../components/SaveEventModal.vue';
 import Modal from '../../components/Modal.vue';
+import { createPinia, setActivePinia } from 'pinia';
 
 describe('SaveEventModal Component', () => {
   let wrapper;
   
   beforeEach(() => {
+    // Setup Pinia
+    setActivePinia(createPinia());
+    
     // Mock alert
     window.alert = vi.fn();
     // Reset mocks
@@ -33,6 +37,9 @@ describe('SaveEventModal Component', () => {
       global: {
         stubs: {
           Teleport: true
+        },
+        directives: {
+          clickOutside: true
         }
       }
     });
@@ -56,6 +63,9 @@ describe('SaveEventModal Component', () => {
       global: {
         stubs: {
           Teleport: true
+        },
+        directives: {
+          clickOutside: true
         }
       }
     });
@@ -74,6 +84,9 @@ describe('SaveEventModal Component', () => {
       global: {
         stubs: {
           Teleport: true
+        },
+        directives: {
+          clickOutside: true
         }
       }
     });
@@ -106,6 +119,9 @@ describe('SaveEventModal Component', () => {
       global: {
         stubs: {
           Teleport: true
+        },
+        directives: {
+          clickOutside: true
         }
       }
     });
@@ -113,8 +129,8 @@ describe('SaveEventModal Component', () => {
     // Set empty event name
     await wrapper.find('#event-name').setValue('');
     
-    // Call the saveEvent method directly to trigger validation
-    wrapper.vm.saveEvent();
+    // Call the handleSave method directly to trigger validation
+    wrapper.vm.handleSave();
     
     // Check if alert was called
     expect(window.alert).toHaveBeenCalledWith('Event name is required');
@@ -132,6 +148,9 @@ describe('SaveEventModal Component', () => {
       global: {
         stubs: {
           Teleport: true
+        },
+        directives: {
+          clickOutside: true
         }
       }
     });
@@ -140,14 +159,15 @@ describe('SaveEventModal Component', () => {
     await wrapper.find('#event-name').setValue('test-event');
     await wrapper.find('#event-category').setValue('test-category');
     
-    // Call the saveEvent method directly
-    wrapper.vm.saveEvent();
+    // Call the handleSave method directly
+    wrapper.vm.handleSave();
     
     // Check that save event was emitted with correct data
     expect(wrapper.emitted('save')).toBeTruthy();
     expect(wrapper.emitted('save')[0][0]).toEqual({
       name: 'test-event',
-      category: 'test-category'
+      category: 'test-category',
+      isUpdate: false
     });
   });
   
@@ -160,6 +180,9 @@ describe('SaveEventModal Component', () => {
       global: {
         stubs: {
           Teleport: true
+        },
+        directives: {
+          clickOutside: true
         }
       }
     });
@@ -168,14 +191,15 @@ describe('SaveEventModal Component', () => {
     await wrapper.find('#event-name').setValue('test-event');
     await wrapper.find('#event-category').setValue('');
     
-    // Call the saveEvent method directly
-    wrapper.vm.saveEvent();
+    // Call the handleSave method directly
+    wrapper.vm.handleSave();
     
     // Check that save event was emitted with default category
     expect(wrapper.emitted('save')).toBeTruthy();
     expect(wrapper.emitted('save')[0][0]).toEqual({
       name: 'test-event',
-      category: 'default'
+      category: 'default',
+      isUpdate: false
     });
   });
   
@@ -188,6 +212,9 @@ describe('SaveEventModal Component', () => {
       global: {
         stubs: {
           Teleport: true
+        },
+        directives: {
+          clickOutside: true
         }
       }
     });
@@ -202,7 +229,8 @@ describe('SaveEventModal Component', () => {
     expect(wrapper.emitted('save')).toBeTruthy();
     expect(wrapper.emitted('save')[0][0]).toEqual({
       name: 'keyboard-event',
-      category: 'default'
+      category: 'default',
+      isUpdate: false
     });
   });
   
@@ -215,6 +243,9 @@ describe('SaveEventModal Component', () => {
       global: {
         stubs: {
           Teleport: true
+        },
+        directives: {
+          clickOutside: true
         }
       }
     });
@@ -230,7 +261,134 @@ describe('SaveEventModal Component', () => {
     expect(wrapper.emitted('save')).toBeTruthy();
     expect(wrapper.emitted('save')[0][0]).toEqual({
       name: 'keyboard-event',
-      category: 'keyboard-category'
+      category: 'keyboard-category',
+      isUpdate: false
+    });
+  });
+  
+  // Test existing event mode
+  it('shows save as menu button when currentEventName is provided', async () => {
+    wrapper = mount(SaveEventModal, {
+      props: {
+        show: true,
+        currentEventName: 'existing-event',
+        currentEventCategory: 'existing-category'
+      },
+      global: {
+        stubs: {
+          Teleport: true
+        },
+        directives: {
+          clickOutside: true
+        },
+        mocks: {
+          useEventsStore: () => ({})
+        }
+      }
+    });
+    
+    // Check that form fields have the right values
+    const nameInput = wrapper.find('#event-name');
+    const categoryInput = wrapper.find('#event-category');
+    
+    expect(nameInput.element.value).toBe('existing-event');
+    expect(categoryInput.element.value).toBe('existing-category');
+    
+    // Check that the save as menu button is visible
+    const saveAsButton = wrapper.find('.btn-primary-light');
+    expect(saveAsButton.exists()).toBe(true);
+  });
+  
+  // Test save as menu toggle
+  it('toggles save as menu when button is clicked', async () => {
+    wrapper = mount(SaveEventModal, {
+      props: {
+        show: true,
+        currentEventName: 'existing-event',
+        currentEventCategory: 'existing-category'
+      },
+      global: {
+        stubs: {
+          Teleport: true
+        },
+        directives: {
+          clickOutside: true
+        },
+        mocks: {
+          useEventsStore: () => ({})
+        }
+      }
+    });
+    
+    // Initially menu is hidden
+    expect(wrapper.find('.absolute').exists()).toBe(false);
+    
+    // Click the save as button
+    await wrapper.find('.btn-primary-light').trigger('click');
+    
+    // Now menu should be visible
+    expect(wrapper.vm.showSaveAsMenu).toBe(true);
+  });
+  
+  // Test save as new functionality
+  it('updates form when save as new is clicked', async () => {
+    wrapper = mount(SaveEventModal, {
+      props: {
+        show: true,
+        currentEventName: 'existing-event',
+        currentEventCategory: 'existing-category'
+      },
+      global: {
+        stubs: {
+          Teleport: true
+        },
+        directives: {
+          clickOutside: true
+        },
+        mocks: {
+          useEventsStore: () => ({})
+        }
+      }
+    });
+    
+    // Call saveAsNew method directly
+    wrapper.vm.saveAsNew();
+    
+    // Check that form values are updated
+    expect(wrapper.find('#event-name').element.value).toContain('existing-event-');
+    expect(wrapper.find('#event-category').element.value).toBe('existing-category');
+  });
+  
+  // Test emitting save with isUpdate flag
+  it('emits save event with isUpdate flag when saving existing event', async () => {
+    wrapper = mount(SaveEventModal, {
+      props: {
+        show: true,
+        currentEventName: 'existing-event',
+        currentEventCategory: 'existing-category'
+      },
+      global: {
+        stubs: {
+          Teleport: true
+        },
+        directives: {
+          clickOutside: true
+        },
+        mocks: {
+          useEventsStore: () => ({})
+        }
+      }
+    });
+    
+    // Call save method
+    wrapper.vm.handleSave();
+    
+    // Check that save event was emitted with isUpdate flag
+    expect(wrapper.emitted('save')).toBeTruthy();
+    expect(wrapper.emitted('save')[0][0]).toEqual({
+      name: 'existing-event',
+      category: 'existing-category',
+      isUpdate: true
     });
   });
   
@@ -243,6 +401,9 @@ describe('SaveEventModal Component', () => {
       global: {
         stubs: {
           Teleport: true
+        },
+        directives: {
+          clickOutside: true
         }
       }
     });

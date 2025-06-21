@@ -104,18 +104,43 @@
               </div>
               
               <div class="flex flex-wrap gap-2 items-center">
-                <button
-                  class="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors"
-                  @click="showSaveEventModal = true"
-                  :disabled="!eventData || isExecuting"
-                  title="Save event"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 21V13H7v8" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 3v4h4" />
-                  </svg>
-                </button>
+                <div class="relative inline-flex save-button">
+                  <button
+                    class="text-xs px-2 py-1 rounded-l bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors save-button"
+                    @click="handleSaveClick"
+                    :disabled="!eventData || isExecuting"
+                    title="Save event"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 21V13H7v8" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 3v4h4" />
+                    </svg>
+                  </button>
+                  <button
+                    class="text-xs px-1 py-1 rounded-r border-l border-gray-300 dark:border-dark-border bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors save-button"
+                    @click="toggleSaveMenu"
+                    :disabled="!eventData || isExecuting"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                  
+                  <!-- Save Menu -->
+                  <div 
+                    v-if="showSaveMenu" 
+                    class="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-dark-100 rounded shadow-lg z-50 py-1 border border-gray-200 dark:border-dark-border save-menu"
+                    v-click-outside="() => showSaveMenu = false"
+                  >
+                    <button 
+                      class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-dark-hover"
+                      @click="showSaveAsModal"
+                    >
+                      Save As...
+                    </button>
+                  </div>
+                </div>
                 
                 <SavedEventSelector 
                   :activeDropdown="activeDropdown"
@@ -331,6 +356,8 @@
     <!-- Save Event Modal -->
     <SaveEventModal
       :show="showSaveEventModal"
+      :current-event-name="selectedEventLabel"
+      :current-event-category="selectedEventCategory"
       @close="showSaveEventModal = false"
       @save="handleSaveEvent"
     />
@@ -367,6 +394,22 @@ export default defineComponent({
     SavedEventSelector
   },
   
+  directives: {
+    clickOutside: {
+      mounted(el, binding) {
+        el._clickOutside = (event) => {
+          if (!(el === event.target || el.contains(event.target))) {
+            binding.value(event);
+          }
+        };
+        document.addEventListener('click', el._clickOutside);
+      },
+      unmounted(el) {
+        document.removeEventListener('click', el._clickOutside);
+      }
+    }
+  },
+  
   setup() {
     const route = useRoute();
     const router = useRouter();
@@ -387,7 +430,9 @@ export default defineComponent({
     const eventData = ref('{}');
     const currentSessionId = ref(null);
     const showSaveEventModal = ref(false);
+    const showSaveMenu = ref(false);
     const selectedEventLabel = ref(null);
+    const selectedEventCategory = ref(null);
     const selectedEventData = ref(null);
     const forceJsonFormat = ref(false);
     const resultViewMode = computed(() => forceJsonFormat.value ? 'json' : 'string');
@@ -745,6 +790,7 @@ export default defineComponent({
     const selectEvent = (event) => {
       eventData.value = JSON.stringify(event.data, null, 2);
       selectedEventLabel.value = event.name;
+      selectedEventCategory.value = event.category || 'default';
       selectedEventData.value = JSON.parse(JSON.stringify(event.data));
     };
     
@@ -758,6 +804,63 @@ export default defineComponent({
       }
     };
     
+    // Toggle save menu dropdown
+    const toggleSaveMenu = (event) => {
+      // Prevent event propagation
+      if (event) {
+        event.stopPropagation();
+      }
+      
+      // Toggle menu state
+      showSaveMenu.value = !showSaveMenu.value;
+      
+      // Close other dropdowns if this one is opening
+      if (showSaveMenu.value) {
+        activeDropdown.value = null;
+      }
+    };
+    
+    // Show save as modal
+    const showSaveAsModal = (event) => {
+      // Prevent event propagation
+      if (event) {
+        event.stopPropagation();
+      }
+      
+      // Close menu and show modal
+      showSaveMenu.value = false;
+      showSaveEventModal.value = true;
+    };
+    
+    // Handle save button click
+    const handleSaveClick = async () => {
+      try {
+        // If there's a current event selected, update it directly
+        if (selectedEventLabel.value && selectedEventCategory.value) {
+          const parsedEvent = JSON.parse(eventData.value);
+          
+          // Save the event with the existing name and category
+          const success = await eventsStore.saveEvent(
+            selectedEventLabel.value,
+            parsedEvent,
+            selectedEventCategory.value
+          );
+          
+          if (success) {
+            notify.success(`Event "${selectedEventLabel.value}" updated successfully`);
+          } else {
+            notify.error('Failed to update event');
+          }
+        } else {
+          // No event selected, show the modal to create a new one
+          showSaveEventModal.value = true;
+        }
+      } catch (error) {
+        notify.error(`Invalid JSON event data: ${error.message}`);
+      }
+    };
+    
+    // Handle save event from modal
     const handleSaveEvent = async (eventInfo) => {
       try {
         const parsedEvent = JSON.parse(eventData.value);
@@ -770,7 +873,17 @@ export default defineComponent({
         );
         
         if (success) {
-          notify.success(`Event saved as "${eventInfo.name}" in category "${eventInfo.category}"`);
+          // Update the selected event label and category if this was a save or update
+          selectedEventLabel.value = eventInfo.name;
+          selectedEventCategory.value = eventInfo.category;
+          
+          // Show appropriate message based on whether this was an update or new save
+          if (eventInfo.isUpdate) {
+            notify.success(`Event "${eventInfo.name}" updated successfully`);
+          } else {
+            notify.success(`Event saved as "${eventInfo.name}" in category "${eventInfo.category}"`);
+          }
+          
           showSaveEventModal.value = false;
         } else {
           notify.error('Failed to save event');
@@ -905,6 +1018,13 @@ export default defineComponent({
           !event.target.closest('[role="menu"]')) {
         showPanelMenu.value = false;
       }
+      
+      // Also close save menu if clicking outside
+      if (showSaveMenu.value && 
+          !event.target.closest('.save-button') && 
+          !event.target.closest('.save-menu')) {
+        showSaveMenu.value = false;
+      }
     };
     
     // Handle opening a dropdown component
@@ -946,7 +1066,9 @@ export default defineComponent({
       eventData,
       currentSessionId,
       showSaveEventModal,
+      showSaveMenu,
       selectedEventLabel,
+      selectedEventCategory,
       selectedEventData,
       forceJsonFormat,
       resultViewMode,
@@ -988,7 +1110,11 @@ export default defineComponent({
       handleDropdownOpen,
       handleDropdownClose,
       handlePanelResize,
-      getCurrentEventData
+      getCurrentEventData,
+      // Nuevas funciones para el menú de guardar
+      toggleSaveMenu,
+      showSaveAsModal,
+      handleSaveClick
     };
   }
 });
@@ -1009,6 +1135,12 @@ export default defineComponent({
 .relative {
   position: relative;
   z-index: 20;
+}
+
+/* Save button dropdown */
+.relative .absolute {
+  z-index: 50;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 /* Eye button styles */

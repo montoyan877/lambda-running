@@ -23,7 +23,7 @@ To use Lambda Running with TypeScript, you'll need:
 Lambda Running can run your TypeScript Lambda functions directly:
 
 ```bash
-lambda-run src/handler.ts
+lambda-run run src/handler.ts
 ```
 
 Lambda Running automatically:
@@ -63,23 +63,10 @@ Lambda Running automatically enables source maps for TypeScript files, allowing 
 To enable debugging with source maps:
 
 ```bash
-lambda-run src/handler.ts --debug
+lambda-run run src/handler.ts --debug
 ```
 
 ## 🔄 TypeScript Development Workflow
-
-### Watch Mode
-
-Lambda Running's watch mode works perfectly with TypeScript:
-
-```bash
-lambda-run watch src/handler.ts
-```
-
-This will:
-1. Watch your TypeScript files for changes
-2. Automatically re-transpile when files change
-3. Re-run your handler with the latest code
 
 ### UI Mode with TypeScript
 
@@ -135,7 +122,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 ### Running the Example
 
 ```bash
-lambda-run src/handler.ts -i '{
+lambda-run run src/handler.ts -i '{
   "pathParameters": {
     "userId": "123"
   }
@@ -184,7 +171,7 @@ export const deleteUser = async (event) => {
 You can run a specific handler:
 
 ```bash
-lambda-run src/users.ts createUser
+lambda-run run src/users.ts createUser
 ```
 
 ### TypeScript Project Setup Recommendations
@@ -250,7 +237,7 @@ For the best experience with Lambda Running and TypeScript:
 
 2. Run your handler with the debug flag:
    ```bash
-   lambda-run src/handler.ts --debug
+   lambda-run run src/handler.ts --debug
    ```
 
 3. Attach VS Code debugger and set breakpoints in your TypeScript files.

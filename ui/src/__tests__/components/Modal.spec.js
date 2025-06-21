@@ -128,4 +128,18 @@ describe('Modal Component', () => {
     // Should not have any close events
     expect(wrapper.emitted().close).toBeFalsy();
   });
+  
+  // Test default value of closeOnClickOutside is false
+  it('has closeOnClickOutside default to false', async () => {
+    wrapper = mount(Modal, {
+      props: {
+        show: true
+      }
+    });
+    
+    await wrapper.find('.modal-overlay').trigger('click');
+    
+    // Should not have any close events since default is now false
+    expect(wrapper.emitted().close).toBeFalsy();
+  });
 }); 

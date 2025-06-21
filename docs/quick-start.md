@@ -37,7 +37,7 @@ exports.handler = async (event) => {
 ### 3. Run the Function Locally
 
 ```bash
-lambda-run hello.js
+lambda-run run hello.js
 ```
 
 This will execute the handler with a default empty event.
@@ -56,7 +56,7 @@ Create a file named `event.json`:
 Run with this event:
 
 ```bash
-lambda-run hello.js -e event.json
+lambda-run run hello.js -e event.json
 ```
 
 ### 5. Start the UI Mode
@@ -75,7 +75,7 @@ This will open a browser with the Lambda Running UI where you can:
 ### Running a Handler with Inline Event
 
 ```bash
-lambda-run hello.js -i '{"name": "Command Line"}'
+lambda-run run hello.js -i '{"name": "Command Line"}'
 ```
 
 ### Saving and Reusing Events
@@ -89,7 +89,7 @@ lambda-run save-event -i '{"name": "Saved Event"}' my-event
 Run with the saved event:
 
 ```bash
-lambda-run hello.js -n my-event
+lambda-run run hello.js -n my-event
 ```
 
 ### Environment Variables
@@ -97,17 +97,8 @@ lambda-run hello.js -n my-event
 Set environment variables:
 
 ```bash
-lambda-run hello.js -v STAGE=dev -v API_URL=https://api.example.com
+lambda-run run hello.js -v STAGE=dev -v API_URL=https://api.example.com
 ```
-
-### Watch Mode
-
-Run with automatic reloading when files change:
-
-```bash
-lambda-run watch hello.js
-```
-
 ## 🔍 Exploring the Features
 
 ### Function Discovery
@@ -121,7 +112,7 @@ lambda-run list
 ### Running Multiple Functions in Sequence
 
 ```bash
-lambda-run hello.js && lambda-run process.js -n order-event
+lambda-run run hello.js && lambda-run run process.js -n order-event
 ```
 
 ### Using AWS SDK
