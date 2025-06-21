@@ -104,43 +104,16 @@
               </div>
               
               <div class="flex flex-wrap gap-2 items-center">
-                <div class="relative inline-flex save-button">
-                  <button
-                    class="text-xs px-2 py-1 rounded-l bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors save-button"
-                    @click="handleSaveClick"
-                    :disabled="!eventData || isExecuting"
-                    title="Save event"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 21V13H7v8" />
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 3v4h4" />
-                    </svg>
-                  </button>
-                  <button
-                    class="text-xs px-1 py-1 rounded-r border-l border-gray-300 dark:border-dark-border bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors save-button"
-                    @click="toggleSaveMenu"
-                    :disabled="!eventData || isExecuting"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                    </svg>
-                  </button>
-                  
-                  <!-- Save Menu -->
-                  <div 
-                    v-if="showSaveMenu" 
-                    class="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-dark-100 rounded shadow-lg z-50 py-1 border border-gray-200 dark:border-dark-border save-menu"
-                    v-click-outside="() => showSaveMenu = false"
-                  >
-                    <button 
-                      class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-dark-hover"
-                      @click="showSaveAsModal"
-                    >
-                      Save As...
-                    </button>
-                  </div>
-                </div>
+                <SaveMenuDropdown 
+                  :activeDropdown="activeDropdown"
+                  :hasEventData="!!eventData"
+                  :isExecuting="isExecuting"
+                  :hasSelectedEvent="!!selectedEventLabel && !!selectedEventCategory"
+                  @dropdown-opened="handleDropdownOpen" 
+                  @dropdown-closed="handleDropdownClose"
+                  @save-click="handleSaveClick"
+                  @save-as-click="showSaveEventModal = true"
+                />
                 
                 <SavedEventSelector 
                   :activeDropdown="activeDropdown"
@@ -380,6 +353,7 @@ import { notify } from '../components/Notification.vue';
 import AWSEventTemplateSelector from '../components/AWSEventTemplateSelector.vue';
 import SavedEventSelector from '../components/SavedEventSelector.vue';
 import { AWS_EVENT_TEMPLATES } from '../utils/awsEventTemplates';
+import SaveMenuDropdown from '../components/SaveMenuDropdown.vue';
 
 export default defineComponent({
   name: 'HandlerView',
@@ -391,7 +365,8 @@ export default defineComponent({
     ResizablePanelVertical,
     SaveEventModal,
     AWSEventTemplateSelector,
-    SavedEventSelector
+    SavedEventSelector,
+    SaveMenuDropdown
   },
   
   directives: {
@@ -428,12 +403,11 @@ export default defineComponent({
     const eventEditor = ref(null);
     const terminal = ref(null);
     const eventData = ref('{}');
-    const currentSessionId = ref(null);
     const showSaveEventModal = ref(false);
-    const showSaveMenu = ref(false);
     const selectedEventLabel = ref(null);
     const selectedEventCategory = ref(null);
     const selectedEventData = ref(null);
+    const currentSessionId = ref(null);
     const forceJsonFormat = ref(false);
     const resultViewMode = computed(() => forceJsonFormat.value ? 'json' : 'string');
     const showPanelMenu = ref(false);
@@ -815,34 +789,6 @@ export default defineComponent({
       }
     };
     
-    // Toggle save menu dropdown
-    const toggleSaveMenu = (event) => {
-      // Prevent event propagation
-      if (event) {
-        event.stopPropagation();
-      }
-      
-      // Toggle menu state
-      showSaveMenu.value = !showSaveMenu.value;
-      
-      // Close other dropdowns if this one is opening
-      if (showSaveMenu.value) {
-        activeDropdown.value = null;
-      }
-    };
-    
-    // Show save as modal
-    const showSaveAsModal = (event) => {
-      // Prevent event propagation
-      if (event) {
-        event.stopPropagation();
-      }
-      
-      // Close menu and show modal
-      showSaveMenu.value = false;
-      showSaveEventModal.value = true;
-    };
-    
     // Handle save button click
     const handleSaveClick = async () => {
       try {
@@ -1029,13 +975,6 @@ export default defineComponent({
           !event.target.closest('[role="menu"]')) {
         showPanelMenu.value = false;
       }
-      
-      // Also close save menu if clicking outside
-      if (showSaveMenu.value && 
-          !event.target.closest('.save-button') && 
-          !event.target.closest('.save-menu')) {
-        showSaveMenu.value = false;
-      }
     };
     
     // Handle opening a dropdown component
@@ -1077,7 +1016,6 @@ export default defineComponent({
       eventData,
       currentSessionId,
       showSaveEventModal,
-      showSaveMenu,
       selectedEventLabel,
       selectedEventCategory,
       selectedEventData,
@@ -1122,9 +1060,6 @@ export default defineComponent({
       handleDropdownClose,
       handlePanelResize,
       getCurrentEventData,
-      // Nuevas funciones para el menú de guardar
-      toggleSaveMenu,
-      showSaveAsModal,
       handleSaveClick
     };
   }
@@ -1146,12 +1081,6 @@ export default defineComponent({
 .relative {
   position: relative;
   z-index: 20;
-}
-
-/* Save button dropdown */
-.relative .absolute {
-  z-index: 50;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 /* Eye button styles */
