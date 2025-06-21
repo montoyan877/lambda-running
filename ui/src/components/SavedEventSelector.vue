@@ -50,30 +50,44 @@
                 {{ category }}
               </div>
               
-              <button
+              <div
                 v-for="event in eventList"
                 :key="event.name"
-                @click="selectEvent(event)"
-                class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-dark-hover transition-colors flex items-center gap-2"
+                class="event-item group w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-dark-hover transition-colors flex items-center"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                
-                <div class="flex-1 min-w-0">
-                  <div class="truncate">{{ event.name }}</div>
-                  <div class="text-xs text-gray-500 dark:text-gray-400 truncate">
-                    {{ formatDate(event.timestamp) }}
+                <button
+                  @click="selectEvent(event)"
+                  class="w-full text-left flex items-center gap-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  
+                  <div class="flex-1 min-w-0 text-left">
+                    <div class="truncate">{{ event.name }}</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400 truncate">
+                      {{ formatDate(event.timestamp) }}
+                    </div>
                   </div>
-                </div>
-              </button>
+                </button>
+                
+                <button
+                  @click.stop="confirmDeleteEvent(event)"
+                  class="delete-button opacity-0 group-hover:opacity-100 transition-opacity p-1 ml-2 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 shrink-0"
+                  title="Delete event"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
             </template>
           </div>
         </div>
       </div>
     </div>
     
-    <!-- Modal for confirmation -->
+    <!-- Modal for replace confirmation -->
     <div v-if="showConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 z-[200] flex items-center justify-center p-4">
       <div class="bg-white dark:bg-dark-100 rounded-lg shadow-xl max-w-md w-full p-4">
         <h3 class="text-lg font-medium mb-2 truncate">Replace Event Data?</h3>
@@ -92,6 +106,30 @@
             class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 transition-colors rounded text-white"
           >
             Replace
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Modal for delete confirmation -->
+    <div v-if="showDeleteConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 z-[200] flex items-center justify-center p-4">
+      <div class="bg-white dark:bg-dark-100 rounded-lg shadow-xl max-w-md w-full p-4">
+        <h3 class="text-lg font-medium mb-2 truncate text-red-600 dark:text-red-500">Delete Event</h3>
+        <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">
+          Are you sure you want to delete the event "{{ eventToDelete?.name }}"? This action cannot be undone.
+        </p>
+        <div class="flex justify-end space-x-2">
+          <button 
+            @click="cancelDeleteEvent" 
+            class="px-4 py-2 text-sm bg-gray-200 dark:bg-dark-hover hover:bg-gray-300 dark:hover:bg-dark-300 transition-colors rounded"
+          >
+            Cancel
+          </button>
+          <button 
+            @click="deleteEvent" 
+            class="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 transition-colors rounded text-white"
+          >
+            Delete
           </button>
         </div>
       </div>
@@ -125,7 +163,9 @@ export default defineComponent({
     
     const searchQuery = ref('');
     const showConfirmModal = ref(false);
+    const showDeleteConfirmModal = ref(false);
     const selectedEvent = ref(null);
+    const eventToDelete = ref(null);
     const dropdownButton = ref(null);
     const dropdownMenu = ref(null);
     const dropdownPosition = ref({});
@@ -270,16 +310,57 @@ export default defineComponent({
       return new Date(timestamp).toLocaleString();
     };
     
+    // Confirm delete event
+    const confirmDeleteEvent = (event) => {
+      eventToDelete.value = event;
+      showDeleteConfirmModal.value = true;
+    };
+    
+    // Cancel delete event
+    const cancelDeleteEvent = () => {
+      eventToDelete.value = null;
+      showDeleteConfirmModal.value = false;
+    };
+    
+    // Delete event
+    const deleteEvent = async () => {
+      if (eventToDelete.value) {
+        try {
+          const success = await eventsStore.deleteEvent(
+            eventToDelete.value.name,
+            eventToDelete.value.category
+          );
+          
+          if (success) {
+            // Refresh events list
+            await eventsStore.fetchEvents();
+            showDeleteConfirmModal.value = false;
+            eventToDelete.value = null;
+          } else {
+            alert('Failed to delete event');
+          }
+        } catch (error) {
+          console.error('Error deleting event:', error);
+          alert(`Error deleting event: ${error.message}`);
+        }
+      }
+    };
+    
     return {
       isActive,
       searchQuery,
       filteredEvents,
       groupedEvents,
       showConfirmModal,
+      showDeleteConfirmModal,
+      eventToDelete,
       isLoading: computed(() => eventsStore.isLoading),
       toggleDropdown,
       selectEvent,
       confirmEventSelection,
+      confirmDeleteEvent,
+      cancelDeleteEvent,
+      deleteEvent,
       formatDate,
       dropdownButton,
       dropdownMenu,
@@ -299,5 +380,25 @@ export default defineComponent({
 /* Ensure the dropdown list itself has a very high z-index */
 .fixed {
   z-index: 9999 !important;
+}
+
+/* Styles for the event item and delete button */
+.event-item {
+  position: relative;
+}
+
+.event-item button:first-child {
+  text-align: left;
+  justify-content: flex-start;
+}
+
+.delete-button {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out, background-color 0.2s ease-in-out;
+  flex-shrink: 0;
+}
+
+.event-item:hover .delete-button {
+  opacity: 1;
 }
 </style> 
